@@ -115,3 +115,6 @@ la_metro_translation_suite/static/compressor/*
 
 # Local uploads
 media/
+
+# Webpack stats
+webpack-stats.json
