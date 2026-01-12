@@ -6,7 +6,11 @@ from django.core.management.base import BaseCommand
 from wagtail.models import Site, Page, Revision
 from wagtail.rich_text import RichText
 
-from la_metro_translation_suite.models import StaticPage, ExampleModel, ExampleModelDetailPage
+from la_metro_translation_suite.models import (
+    StaticPage,
+    ExampleModel,
+    ExampleModelDetailPage,
+)
 
 
 class Command(BaseCommand):

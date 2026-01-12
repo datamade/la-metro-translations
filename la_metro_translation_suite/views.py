@@ -3,7 +3,6 @@ import os
 from django.shortcuts import render
 
 
-
 def robots_txt(request):
     return render(
         request,

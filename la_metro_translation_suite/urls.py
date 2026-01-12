@@ -13,7 +13,7 @@ urlpatterns = [
     path("django-admin/", admin.site.urls),
     path("admin/", include(wagtailadmin_urls)),
     path("documents/", include(wagtaildocs_urls)),
-    path('robots.txt/', views.robots_txt),
+    path("robots.txt/", views.robots_txt),
 ]
 
 urlpatterns = urlpatterns + [

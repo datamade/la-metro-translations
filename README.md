@@ -57,7 +57,6 @@ to this file will automatically be applied during local development.
 To add styles unrelated to Bootstrap, e.g., customizing a map or some other novel element,
 update the included CSS file at `la_metro_translation_suite/static/css/la_metro_translation_suite.css`.
 
-
 #### Managing CMS content
 
 Initial CMS content is loaded in a data migration using the `initialize_database` management
@@ -80,4 +79,3 @@ To load a fixture into your local database, run:
 ```bash
 docker compose run --rm app python manage.py load_content
 ```
-
