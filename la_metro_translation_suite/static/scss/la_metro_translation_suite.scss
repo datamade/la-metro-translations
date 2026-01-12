@@ -1,0 +1,14 @@
+/*
+Add Bootstrap overrides and customization here.
+See: https://getbootstrap.com/docs/5.3/customize/sass/#importing
+*/
+
+// Include any default variable overrides here (though functions won't be available)
+
+@import "/app/node_modules/bootstrap/scss/bootstrap";
+
+// Then add additional custom code here
+.row {
+  margin-top: 1.5rem;
+  margin-bottom: 1.5rem;
+}

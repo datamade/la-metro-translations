@@ -1,0 +1,9 @@
+{% load wagtailcore_tags %}
+
+<div class="stream-field-block">
+  {% if block.block_type == 'richtext' %}
+    {{ block|richtext }}
+  {% else %}
+    {% include_block block %}
+  {% endif %}
+</div>

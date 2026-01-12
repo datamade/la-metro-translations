@@ -1,0 +1,16 @@
+FROM ghcr.io/datamade/la-metro-translation-suite:main
+
+# Install any requirements not in the base image
+COPY ./requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY ./package.json /app/package.json
+RUN npm install
+
+COPY . /app
+
+# Bake static files into the image
+RUN npm run build
+
+ENV DJANGO_SECRET_KEY 'foobar'
+RUN python manage.py collectstatic --noinput

@@ -1,0 +1,24 @@
+{
+  "status": "done",
+  "assets": {
+    "bootstrap-24180f1e7cccecd71a5d.js": {
+      "name": "bootstrap-24180f1e7cccecd71a5d.js",
+      "path": "/app/assets/bundles/bootstrap-24180f1e7cccecd71a5d.js",
+      "publicPath": "http://localhost:3000/static/bundles/bootstrap-24180f1e7cccecd71a5d.js"
+    },
+    "react_block-24180f1e7cccecd71a5d.js": {
+      "name": "react_block-24180f1e7cccecd71a5d.js",
+      "path": "/app/assets/bundles/react_block-24180f1e7cccecd71a5d.js",
+      "publicPath": "http://localhost:3000/static/bundles/react_block-24180f1e7cccecd71a5d.js"
+    }
+  },
+  "chunks": {
+    "bootstrap": [
+      "bootstrap-24180f1e7cccecd71a5d.js"
+    ],
+    "react_block": [
+      "react_block-24180f1e7cccecd71a5d.js"
+    ]
+  },
+  "publicPath": "http://localhost:3000/static/bundles/"
+}

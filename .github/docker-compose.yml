@@ -1,0 +1,10 @@
+services:
+  webpack:
+    build:
+      dockerfile: Dockerfile.deploy
+      target: ""
+
+  app:
+    build:
+      dockerfile: Dockerfile.deploy
+      target: ""

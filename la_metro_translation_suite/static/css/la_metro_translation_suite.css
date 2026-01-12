@@ -1,0 +1,10 @@
+/*
+Add styles unrelated to Bootstrap here. Customizing Bootstrap?
+Make your changes to the Sass file.
+*/
+.stream-field-block img {
+  max-height: 75vh;
+  width: auto;
+  display: block;
+  margin: auto;
+}
