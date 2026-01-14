@@ -9,4 +9,4 @@ release:
     - ./scripts/release.sh
   image: web
 run:
-  web: gunicorn -t 180 -w 3 --log-level debug la_metro_translation_suite.wsgi:application
+  web: gunicorn -t 180 -w 3 --log-level debug la_metro_translations.wsgi:application

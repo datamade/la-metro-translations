@@ -1,7 +1,7 @@
 {
-  "name": "la_metro_translation_suite",
+  "name": "la_metro_translations",
   "version": "0.0.0",
-  "description": "JavaScript development setup for la_metro_translation_suite",
+  "description": "JavaScript development setup for la_metro_translations",
   "scripts": {
     "build": "webpack --mode=production",
     "serve": "webpack-dev-server --config /app/webpack.config.js --mode=development --host 0.0.0.0 --hot --open"

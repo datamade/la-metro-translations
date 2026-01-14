@@ -1,0 +1,16 @@
+{% load wagtailcore_tags %}
+
+{% if value.title %}
+  <h2>{{ value.title }}</h2>
+{% endif %}
+{% if value.description %}
+  {{ value.description|richtext }}
+{% endif %}
+<div id="react-block">
+  {% include 'la_metro_translations/partials/loading.html' %}
+</div>
+
+{% block extra_js %}
+  {% load render_bundle from webpack_loader %}
+  {% render_bundle 'react_block' js %}
+{% endblock %}

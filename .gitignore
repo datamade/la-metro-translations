@@ -110,8 +110,8 @@ venv.bak/
 
 # Compiled JavaScript
 node_modules/
-la_metro_translation_suite/static/compressor/*
-!la_metro_translation_suite/static/js/lib/
+la_metro_translations/static/compressor/*
+!la_metro_translations/static/js/lib/
 
 # Local uploads
 media/

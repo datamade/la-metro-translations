@@ -1,5 +1,5 @@
 {
-  "name": "la_metro_translation_suite",
+  "name": "la_metro_translations",
   "scripts": {},
   "env": {
     "DJANGO_ALLOWED_HOSTS": {

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% load wagtailcore_tags %}
+
+{% block body %}
+  <div class="container-fluid">
+    <div class="row">
+      <div class="col-md-10 offset-md-1">
+        <h1>{{page.title}}</h1>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-md-10 offset-md-1 fs-4">
+        <p>This is a page about the <strong>{{ page.object.name }}</strong> object!</p>
+      </div>
+    </div>
+    {% for block in page.body %}
+      <div class="row">
+        <div class="col-md-10 offset-md-1">
+          {% include 'la_metro_translations/partials/stream_field.html' %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% endblock %}

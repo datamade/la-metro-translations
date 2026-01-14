@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% load wagtailcore_tags %}
+
+{% block title %}{{ page.title }}{% endblock %}
+
+{% block body %}
+  {% for block in page.body %}
+    <!-- hero for the first block -->
+    {% if forloop.first %}
+      <div class="row bg-dark text-light fs-1 py-5 mt-0">
+        <div class="col-sm-10 offset-md-1">
+          {% include 'la_metro_translations/partials/stream_field.html' %}
+        </div>
+      </div>
+      <div class="container-fluid">
+    {% else %}
+      <div class="row">
+        <div class="col col-md-10 offset-md-1">
+          {% include 'la_metro_translations/partials/stream_field.html' %}
+        </div>
+      </div>
+    {% endif %}
+  {% endfor %}
+  </div> <!-- end container-fluid -->
+{% endblock %}

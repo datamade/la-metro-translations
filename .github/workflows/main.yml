@@ -40,7 +40,7 @@ jobs:
         with:
           continue_on_error: false
           black: true
-          black_args: "--check . --exclude 'la_metro_translation_suite/migrations|node_modules'"
+          black_args: "--check . --exclude 'la_metro_translations/migrations|node_modules'"
           flake8: true
           flake8_args: "--config=.flake8"
           eslint: true

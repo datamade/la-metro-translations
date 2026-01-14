@@ -4,9 +4,9 @@ set -e
 # https://github.com/docker-library/postgres/issues/146#issuecomment-872486465
 # If postgres isn't ready yet, wait and try again
 readonly SLEEP_TIME=5
-readonly PG_HOST="la_metro_translation_suite-postgres"
+readonly PG_HOST="la_metro_translations-postgres"
 readonly PG_USER="postgres"
-readonly PG_DB="la_metro_translation_suite"
+readonly PG_DB="la_metro_translations"
 
 # note: the PGPASSWORD envar is passed in
 until timeout 3 psql -h $PG_HOST -U $PG_USER -c "select 1" -d $PG_DB > /dev/null

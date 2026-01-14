@@ -1,4 +1,4 @@
-FROM ghcr.io/datamade/la-metro-translation-suite:main
+FROM ghcr.io/datamade/la-metro-translations:main
 
 # Install any requirements not in the base image
 COPY ./requirements.txt /app/requirements.txt

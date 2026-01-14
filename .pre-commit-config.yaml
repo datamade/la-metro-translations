@@ -10,13 +10,13 @@ repos:
     rev: 22.3.0
     hooks:
       - id: black
-        exclude: ^(la_metro_translation_suite/migrations/)
+        exclude: ^(la_metro_translations/migrations/)
 
   - repo: https://github.com/pycqa/flake8
     rev: "9f60881"
     hooks:
       - id: flake8
-        exclude: la_metro_translation_suite/migrations
+        exclude: la_metro_translations/migrations
         args: [--max-line-length=88, --extend-ignore=E203]
 
   - repo: https://github.com/rtts/djhtml
@@ -40,5 +40,5 @@ repos:
     rev: v2.5.1
     hooks:
       - id: prettier
-        exclude: ^(la_metro_translation_suite/static/js/lib/|la_metro_translation_suite/static/css/bootstrap|la_metro_translation_suite/templates/)
+        exclude: ^(la_metro_translations/static/js/lib/|la_metro_translations/static/css/bootstrap|la_metro_translations/templates/)
         files: \.(js|ts|jsx|tsx|css|scss|less|json|markdown|md|yaml|yml)$

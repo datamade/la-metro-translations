@@ -10,12 +10,12 @@ services:
       - 3000:3000
     volumes:
       - .:/app
-      - la_metro_translation_suite-node-modules:/app/node_modules
+      - la_metro_translations-node-modules:/app/node_modules
     command: npm run serve
 
   app:
-    image: la_metro_translation_suite
-    container_name: la_metro_translation_suite
+    image: la_metro_translations
+    container_name: la_metro_translations
     build:
       context: .
       dockerfile: Dockerfile
@@ -29,7 +29,7 @@ services:
         condition: service_healthy
     volumes:
       - .:/app
-      - la_metro_translation_suite-node-modules:/app/node_modules
+      - la_metro_translations-node-modules:/app/node_modules
     environment:
       DJANGO_SECRET_KEY: reallysupersecret
       DJANGO_MANAGEPY_MIGRATE: "on"
@@ -41,7 +41,7 @@ services:
     command: python manage.py runserver 0.0.0.0:8000
 
   postgres:
-    container_name: la_metro_translation_suite-postgres
+    container_name: la_metro_translations-postgres
     image: postgres
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
@@ -51,12 +51,12 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: la_metro_translation_suite
+      POSTGRES_DB: la_metro_translations
     volumes:
-      - la_metro_translation_suite-db-data:/var/lib/postgresql
+      - la_metro_translations-db-data:/var/lib/postgresql
     ports:
       - 32001:5432
 
 volumes:
-  la_metro_translation_suite-db-data:
-  la_metro_translation_suite-node-modules:
+  la_metro_translations-db-data:
+  la_metro_translations-node-modules:

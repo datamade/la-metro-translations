@@ -1,9 +1,0 @@
-{% load navigation_tags wagtailcore_tags %}
-
-{% get_site_root as site_root %}
-<li class="nav-item">
-  <a class="nav-link" href="{% pageurl site_root %}">Home</a>
-</li>
-{% for menuitem in site_root.get_children.live.in_menu %}
-  {% include 'la_metro_translation_suite/partials/nav_item.html' with item=item %}
-{% endfor %}

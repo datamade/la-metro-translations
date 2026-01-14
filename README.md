@@ -51,11 +51,11 @@ docker compose -f docker-compose.yml -f tests/docker-compose.yml run --rm app
 
 We use the Bootstrap Node package to build a custom version of Bootstrap for our use. To
 make changes to Bootstrap defaults (colors, layout, etc.), update the included Sass file
-at `la_metro_translation_suite/static/scss/la_metro_translation_suite.scss`. Changes
+at `la_metro_translations/static/scss/la_metro_translations.scss`. Changes
 to this file will automatically be applied during local development.
 
 To add styles unrelated to Bootstrap, e.g., customizing a map or some other novel element,
-update the included CSS file at `la_metro_translation_suite/static/css/la_metro_translation_suite.css`.
+update the included CSS file at `la_metro_translations/static/css/la_metro_translations.css`.
 
 #### Managing CMS content
 

@@ -5,8 +5,8 @@ const BundleTracker = require("webpack-bundle-tracker")
 const config = {
   context: __dirname,
   entry: {
-    bootstrap: "./la_metro_translation_suite/static/js/bootstrap.js",
-    react_block: "./la_metro_translation_suite/static/js/react_block.js",
+    bootstrap: "./la_metro_translations/static/js/bootstrap.js",
+    react_block: "./la_metro_translations/static/js/react_block.js",
   },
   output: {
     path: path.resolve(__dirname, "assets/bundles/"),
@@ -20,7 +20,7 @@ const config = {
     }),
   ],
   devServer: {
-    watchFiles: ["la_metro_translation_suite/static/**/*.js"],
+    watchFiles: ["la_metro_translations/static/**/*.js"],
     host: "0.0.0.0",
     port: 3000,
     compress: false,
