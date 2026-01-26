@@ -243,3 +243,9 @@ for host in ALLOWED_HOSTS:
         origin = f"https://{host}"
 
     CSRF_TRUSTED_ORIGINS.append(origin)
+
+try:
+    MISTRAL_API_KEY = os.environ["MISTRAL_API_KEY"]
+except KeyError as e:
+    print("Please enter a Mistral api key in order to enable OCR and translation.")
+    raise e
