@@ -120,17 +120,15 @@ class SourceDoc(DocumentBase):
     ]
 
     title = models.CharField()
-    datetime = models.DateTimeField(
-        blank=True,
-        null=True,
-    )
+    created_at = models.DateField(blank=True, null=True)
     metro_doc_type = models.CharField(
         choices=METRO_DOC_TYPE_CHOICES, blank=True, null=True
     )
+    doc_id = models.CharField(unique=True, blank=True, null=True)
     source_url = models.URLField(
         help_text=(
             "Link to the original document. Since they are uploaded as pdfs, "
-            "this field can also count as the pdf version."
+            "this field can serve as the pdf version."
         )
     )
 
