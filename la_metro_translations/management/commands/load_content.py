@@ -39,12 +39,8 @@ class Command(BaseCommand):
 
         if not selected_content.issubset(valid_content):
             invalid_values = selected_content - valid_content
-            raise ValueError(
-                "Invalid content types: {}. Valid options are: \
-                              content, images".format(
-                    invalid_values
-                )
-            )
+            raise ValueError("Invalid content types: {}. Valid options are: \
+                              content, images".format(invalid_values))
 
         for content in options["content_type"]:
             getattr(self, "load_{}".format(content))(options)

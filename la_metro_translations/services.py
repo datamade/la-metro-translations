@@ -74,7 +74,7 @@ class TranslationService:
     @staticmethod
     def translate_text(source_doc: SourceDoc, dest_language: str) -> str | None:
         """
-        Translates a string to a destination language using Mistral,
+        Translates the markdown of a source doc to a destination language using Mistral,
         while aiming to preserve markdown.
 
         Any base64 encoded images within the string are removed and cached
