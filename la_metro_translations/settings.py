@@ -246,6 +246,5 @@ for host in ALLOWED_HOSTS:
 
 try:
     MISTRAL_API_KEY = os.environ["MISTRAL_API_KEY"]
-except KeyError as e:
+except KeyError:
     print("Please enter a Mistral api key in order to enable OCR and translation.")
-    raise e
