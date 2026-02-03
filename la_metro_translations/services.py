@@ -1,11 +1,15 @@
 import json
 import re
 import time
+import logging
 
 from django.conf import settings
 from mistralai import Mistral
 from mistralai.models.sdkerror import SDKError
-from la_metro_translations.models import SourceDoc
+from la_metro_translations.models import Document
+from la_metro_translations.prompts import SYSTEM_MESSAGE
+
+logger = logging.getLogger(__name__)
 
 
 class OCRService:
@@ -25,9 +29,11 @@ class OCRService:
                 include_image_base64=True,
             )
         except SDKError as e:
-            print("Error occurred when OCR'ing document. " f"Document url: {doc_url}")
-            print(e)
-            print("Unable to OCR. Skipping...")
+            logger.warning(
+                "Error occurred when OCR'ing document. " f"Document url: {doc_url}"
+            )
+            logger.warning(e)
+            logger.warning("Unable to OCR. Skipping...")
             return
 
         data = json.loads(ocr_response.model_dump_json())
@@ -35,11 +41,13 @@ class OCRService:
         try:
             pages = data["pages"]
         except KeyError as e:
-            print("Error occurred when OCR'ing document. " f"Document url: {doc_url}")
-            print(e)
-            print("Response from model:")
-            print(data)
-            print("Unable to OCR. Skipping...")
+            logger.warning(
+                "Error occurred when OCR'ing document. " f"Document url: {doc_url}"
+            )
+            logger.warning(e)
+            logger.warning("Response from model:")
+            logger.warning(data)
+            logger.warning("Unable to OCR. Skipping...")
             return
 
         doc_text = ""
@@ -72,7 +80,7 @@ class OCRService:
 
 class TranslationService:
     @staticmethod
-    def translate_text(source_doc: SourceDoc, dest_language: str) -> str | None:
+    def translate_text(source_doc: Document, dest_language: str) -> str | None:
         """
         Translates the markdown of a source doc to a destination language using Mistral,
         while aiming to preserve markdown.
@@ -82,7 +90,7 @@ class TranslationService:
         translation time and cost.
         """
         start_time = time.time()
-        capitalized_lang = dest_language[0].upper() + dest_language[1:]
+        formatted_lang = dest_language.title()
         client = Mistral(api_key=settings.MISTRAL_API_KEY)
 
         # Find image tags containing base64 up to and including first close-parentheses
@@ -101,47 +109,31 @@ class TranslationService:
             # Replace entire image tag with a placeholder, ex. "![img-0.jpeg]()"
             modded_source_text = modded_source_text.replace(i, f"{img_label}()")
 
-        # TODO: consider whether we should preserve page structure in these.
-        # TODO: The ocr'd version has them, so it may be worth keeping
-        system_msg = (
-            "Translate the text provided to the language requested by the user. "
-            "Maintain the text's professional tone, while prioritizing returning "
-            "all the text given. "
-            "Do not translate any acronyms found in the original text. "
-            "Preserve all markdown formatting, image tags, code blocks, links, "
-            "headings, and inline markup. "
-            "Preserve page structure; do not omit Page numbers in the original text. "
-            "Only change natural language; do not modify tags, backticks, URLs, "
-            "or markdown structure. "
-            "If a natural language sentence is incomplete, translate it as it is "
-            "written and do not attempt to fill in parts of the sentence."
-        )
-
         try:
             chat_response = client.chat.complete(
                 model="mistral-small-latest",
                 messages=[
                     {
                         "role": "system",
-                        "content": system_msg,
+                        "content": SYSTEM_MESSAGE,
                     },
                     {
                         "role": "user",
                         "content": (
                             "Translate the following text to "
-                            f"{capitalized_lang}: {modded_source_text}"
+                            f"{formatted_lang}: {modded_source_text}"
                         ),
                     },
                 ],
             )
         except SDKError as e:
-            print(
+            logger.warning(
                 "Error occurred when translating document. "
-                f"Language: {capitalized_lang}; "
+                f"Language: {formatted_lang}; "
                 f"Document ID: {source_doc.doc_id}"
             )
-            print(e)
-            print("Unable to translate. Skipping...")
+            logger.warning(e)
+            logger.warning("Unable to translate. Skipping...")
             return
 
         data = json.loads(chat_response.model_dump_json())
@@ -149,23 +141,25 @@ class TranslationService:
         try:
             translated_string = data["choices"][0]["message"]["content"]
         except KeyError as e:
-            print("Error occurred when translating document.")
-            print(f"Language: {capitalized_lang}; " f"Document ID: {source_doc.doc_id}")
-            print(e)
-            print("Response from model:")
-            print(data)
-            print("Unable to translate. Skipping...")
+            logger.warning("Error occurred when translating document.")
+            logger.warning(
+                f"Language: {formatted_lang}; " f"Document ID: {source_doc.doc_id}"
+            )
+            logger.warning(e)
+            logger.warning("Response from model:")
+            logger.warning(data)
+            logger.warning("Unable to translate. Skipping...")
             return
 
         # Reinsert images where they belong
         for label in images_cache.keys():
             full_image = label + images_cache[label]
             if label not in translated_string:
-                print(
-                    f"Warning: {label} is missing in the {capitalized_lang} translation"
+                logger.warning(
+                    f"Warning: {label} is missing in the {formatted_lang} translation"
                 )
             else:
                 translated_string = translated_string.replace(f"{label}()", full_image)
 
-        print("--- %s seconds to complete ---" % (time.time() - start_time))
+        logger.info("--- %s seconds to complete ---" % (time.time() - start_time))
         return translated_string

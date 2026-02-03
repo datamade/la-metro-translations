@@ -9,6 +9,7 @@ https://docs.djangoproject.com/en/stable/ref/settings/
 """
 
 import os
+import sys
 
 import dj_database_url
 import sentry_sdk
@@ -41,6 +42,33 @@ if os.getenv("SENTRY_DSN"):
         before_send=before_send,
         integrations=[DjangoIntegration()],
     )
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "console": {
+            "format": "[%(asctime)s][%(levelname)s] %(name)s "
+            "%(filename)s:%(funcName)s:%(lineno)d | %(message)s",
+            "datefmt": "%H:%M:%S",
+        },
+    },
+    "handlers": {
+        "console": {
+            "level": "INFO",
+            "class": "logging.StreamHandler",
+            "formatter": "console",
+            "stream": sys.stdout,
+        },
+    },
+    "root": {"handlers": ["console"], "level": "INFO"},
+    "loggers": {
+        "la_metro_translations": {
+            "handlers": ["console"],
+            "propagate": True,
+        },
+    },
+}
 
 # Application definition
 
