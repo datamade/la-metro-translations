@@ -80,7 +80,7 @@ class OCRService:
 
 class TranslationService:
     @staticmethod
-    def translate_text(source_doc: Document, dest_language: str) -> str | None:
+    def translate_text(document: Document, dest_language: str) -> str | None:
         """
         Translates the markdown of a source doc to a destination language using Mistral,
         while aiming to preserve markdown.
@@ -96,7 +96,7 @@ class TranslationService:
         # Find image tags containing base64 up to and including first close-parentheses
         img_pattern = r"\!\[img\-\d+\.jpeg\]\(data\:image\/jpeg\;base64.+?(?:\))"
         images_cache = {}
-        source_text = source_doc.markdown
+        source_text = document.content.markdown
         modded_source_text = source_text
 
         image_tags = re.findall(img_pattern, source_text)
@@ -128,9 +128,9 @@ class TranslationService:
             )
         except SDKError as e:
             logger.warning(
-                "Error occurred when translating document. "
-                f"Language: {formatted_lang}; "
-                f"Document ID: {source_doc.doc_id}"
+                f"Error occurred when translating document to {formatted_lang}. "
+                f"Document ID in BoardAgendas: {document.document_id} ; "
+                f"Document url: {document.source_url}"
             )
             logger.warning(e)
             logger.warning("Unable to translate. Skipping...")
@@ -141,9 +141,10 @@ class TranslationService:
         try:
             translated_string = data["choices"][0]["message"]["content"]
         except KeyError as e:
-            logger.warning("Error occurred when translating document.")
             logger.warning(
-                f"Language: {formatted_lang}; " f"Document ID: {source_doc.doc_id}"
+                f"Error occurred when translating document to {formatted_lang}. "
+                f"Document ID in BoardAgendas: {document.document_id} ; "
+                f"Document url: {document.source_url}"
             )
             logger.warning(e)
             logger.warning("Response from model:")
