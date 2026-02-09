@@ -12,6 +12,7 @@ urlpatterns = [
     path("django-admin/", admin.site.urls),
     path("admin/", include(wagtailadmin_urls)),
     path("documents/", include(wagtaildocs_urls)),
+    path("api/new-document/", views.NewDocumentWebhook.as_view(), name="new_document"),
     path("robots.txt/", views.robots_txt),
 ]
 
