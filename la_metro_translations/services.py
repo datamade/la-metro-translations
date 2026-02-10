@@ -7,9 +7,10 @@ from django.conf import settings
 from mistralai import Mistral
 from mistralai.models.sdkerror import SDKError
 from la_metro_translations.models import Document
-from la_metro_translations.prompts import SYSTEM_MESSAGE
 
 logger = logging.getLogger(__name__)
+with open("la_metro_translations/prompt.txt") as f:
+    SYSTEM_MESSAGE = f.read()
 
 
 class OCRService:
