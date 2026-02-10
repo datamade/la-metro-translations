@@ -65,7 +65,7 @@ LOGGING = {
     "loggers": {
         "la_metro_translations": {
             "handlers": ["console"],
-            "propagate": True,
+            "propagate": False,
         },
     },
 }
