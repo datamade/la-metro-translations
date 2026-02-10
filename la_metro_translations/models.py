@@ -138,8 +138,8 @@ class DocumentContent(models.Model):
 
     APPROVAL_STATUS_CHOICES = [
         ("approved", "Approved for Publishing"),
-        ("waiting", "Waiting for Review"),
-        ("adjustment", "Needs Adjustment"),
+        ("waiting", "Waiting for Initial Review"),
+        ("revision", "Needs Revision"),
     ]
 
     markdown = models.TextField()
@@ -152,7 +152,7 @@ class DocumentContent(models.Model):
     updated_at = models.DateTimeField(
         auto_now=True, help_text="Date this content was last updated in this app."
     )
-    document = models.ForeignKey(
+    document = models.OneToOneField(
         Document, on_delete=models.CASCADE, related_name="content"
     )
 
@@ -168,8 +168,8 @@ class DocumentTranslation(models.Model):
     ]
     APPROVAL_STATUS_CHOICES = [
         ("approved", "Approved for Publishing"),
-        ("waiting", "Waiting for Review"),
-        ("adjustment", "Needs Adjustment"),
+        ("waiting", "Waiting for Initial Review"),
+        ("revision", "Needs Revision"),
     ]
 
     markdown = models.TextField()
@@ -184,7 +184,7 @@ class DocumentTranslation(models.Model):
         auto_now=True, help_text="Date this translation was last updated in this app."
     )
     document_content = models.ForeignKey(
-        DocumentContent, on_delete=models.CASCADE, related_name="translation"
+        DocumentContent, on_delete=models.CASCADE, related_name="translations"
     )
 
 
@@ -202,7 +202,7 @@ class DocumentContentFile(models.Model):
     format = models.CharField(choices=FORMAT_CHOICES)
     url = models.URLField(blank=True, null=True)
     document_content = models.ForeignKey(
-        DocumentContent, on_delete=models.CASCADE, related_name="file"
+        DocumentContent, on_delete=models.CASCADE, related_name="files"
     )
 
 
@@ -220,5 +220,5 @@ class DocumentTranslationFile(models.Model):
     format = models.CharField(choices=FORMAT_CHOICES)
     url = models.URLField(blank=True, null=True)
     document_translation = models.ForeignKey(
-        DocumentTranslation, on_delete=models.CASCADE, related_name="file"
+        DocumentTranslation, on_delete=models.CASCADE, related_name="files"
     )
