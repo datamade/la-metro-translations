@@ -108,11 +108,18 @@ class Document(models.Model):
 
     title = models.CharField()
     source_url = models.URLField(help_text="Link to the original pdf document.")
-    created_at = models.DateField(
+    created_at = models.DateTimeField(
         blank=True,
         null=True,
         help_text=(
             "Date this original document was created, as per the BoardAgendas app."
+        ),
+    )
+    updated_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text=(
+            "Date this original document was updated, as per the BoardAgendas app."
         ),
     )
     document_type = models.CharField(
@@ -146,7 +153,7 @@ class DocumentContent(models.Model):
     approval_status = models.CharField(
         choices=APPROVAL_STATUS_CHOICES, default="waiting"
     )
-    created_at = models.DateField(
+    created_at = models.DateTimeField(
         auto_now_add=True, help_text="Date this content was created in this app."
     )
     updated_at = models.DateTimeField(
@@ -163,7 +170,7 @@ class DocumentTranslation(models.Model):
     """
 
     LANGUAGE_CHOICES = [
-        # TODO: add more when pilot languages are decided
+        ("english", "English"),
         ("spanish", "Spanish"),
     ]
     APPROVAL_STATUS_CHOICES = [
@@ -177,7 +184,7 @@ class DocumentTranslation(models.Model):
     approval_status = models.CharField(
         choices=APPROVAL_STATUS_CHOICES, default="waiting"
     )
-    created_at = models.DateField(
+    created_at = models.DateTimeField(
         auto_now_add=True, help_text="Date this translation was created in this app."
     )
     updated_at = models.DateTimeField(
@@ -188,25 +195,7 @@ class DocumentTranslation(models.Model):
     )
 
 
-class DocumentContentFile(models.Model):
-    """
-    A version of a document's original content, uploaded to cloud storage.
-    """
-
-    FORMAT_CHOICES = [
-        ("md", "md"),
-        ("rtf", "rtf"),
-        ("pdf", "pdf"),
-    ]
-
-    format = models.CharField(choices=FORMAT_CHOICES)
-    url = models.URLField(blank=True, null=True)
-    document_content = models.ForeignKey(
-        DocumentContent, on_delete=models.CASCADE, related_name="files"
-    )
-
-
-class DocumentTranslationFile(models.Model):
+class TranslationFile(models.Model):
     """
     A version of a document's translation, uploaded to cloud storage.
     """
