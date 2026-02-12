@@ -56,37 +56,14 @@ class MistralOCRService:
             logger.warning("Unable to OCR. Skipping...")
             return
 
-        doc_text = ""
-
-        for page in pages:
-            markdown = page["markdown"]
-
-            # Unescaped dollar signs cause unintended math formatting
-            markdown = markdown.replace("$", "\\$")
-
-            # Insert extracted tables and images
-            for table in page["tables"]:
-                table_content = table["content"]
-
-                # Replace bracketed version
-                markdown = markdown.replace(f"[{table['id']}]", table_content)
-                # Remove parenthesesed version
-                markdown = markdown.replace(f"({table['id']})", "")
-
-            for image in page["images"]:
-                # Leave the bracketed version, but replace parenthesesed version
-                markdown = markdown.replace(
-                    f"({image['id']})", f"({image['image_base64']})"
-                )
-
-            doc_text += f"{markdown}\n\nEnd of Page {page['index']+1}\n\n"
-
+        doc_text = MistralOCRService.process_pages(pages)
         return doc_text
 
     @staticmethod
     def batch_extract(documents: Union[QuerySet, List[Document]]) -> Generator[dict]:
         """
-        OCR multiple documents using a batch job request.
+        OCR multiple documents using a batch job request,
+        and return the responses.
         """
         start_time = time.time()
         client = Mistral(api_key=settings.MISTRAL_API_KEY)
@@ -95,7 +72,7 @@ class MistralOCRService:
         batch_file = StringIO()
         for doc in documents:
             entry = {
-                "custom_id": str(doc.document_id),
+                "custom_id": f"{doc.document_type}:{doc.document_id}",
                 "body": {
                     "document": {
                         "type": "document_url",
@@ -121,8 +98,6 @@ class MistralOCRService:
             input_files=[batch_data.id],
             model="mistral-ocr-latest",
             endpoint="/v1/ocr",
-            # TODO: remember to change
-            metadata={"job_type": "testing"},
         )
 
         retrieved_job = client.batch.jobs.get(job_id=created_job.id)
@@ -164,7 +139,50 @@ class MistralOCRService:
         )
 
         for line in response.iter_lines():
-            yield json.loads(line)
+            result = json.loads(line)
+            full_markdown = MistralOCRService.process_pages(
+                result["response"]["body"]["pages"]
+            )
+            result["response"]["body"]["full_markdown"] = full_markdown
+
+            yield result
+
+    @staticmethod
+    def process_pages(pages: List[dict]) -> str:
+        """
+        Reinserts tables and images into the markdown of each page.
+
+        TODO: try to reinsert hyperlinks
+        there's no way to find out where the links used to exist within
+        the original document, outside of what page it existed in
+        """
+
+        doc_text = ""
+
+        for page in pages:
+            markdown = page["markdown"]
+
+            # Unescaped dollar signs cause unintended math formatting
+            markdown = markdown.replace("$", "\\$")
+
+            # Insert extracted tables and images
+            for table in page["tables"]:
+                table_content = table["content"]
+
+                # Replace bracketed version
+                markdown = markdown.replace(f"[{table['id']}]", table_content)
+                # Remove parenthesesed version
+                markdown = markdown.replace(f"({table['id']})", "")
+
+            for image in page["images"]:
+                # Leave the bracketed version, but replace parenthesesed version
+                markdown = markdown.replace(
+                    f"({image['id']})", f"({image['image_base64']})"
+                )
+
+            doc_text += f"{markdown}\n\nEnd of Page {page['index']+1}\n\n"
+
+        return doc_text
 
 
 class TranslationService(ABC):
