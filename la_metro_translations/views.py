@@ -12,73 +12,103 @@ from la_metro_translations.models import Document
 
 
 @method_decorator(csrf_exempt, "dispatch")
-class NewDocumentWebhook(View):
+class UpdateDocumentsWebhook(View):
     """
-    Create a new base Document with information from the BoardAgendas app.
+    Update or create base Documents with information from the BoardAgendas app.
     """
 
     def post(self, request):
         data = json.loads(request.body)
+        errors = {"errors": []}
 
         # Check authorization
         received_key = data.get("api_key")
         if not received_key:
-            response = {
-                "message": (
-                    "Bad Request: Api key missing. "
-                    "Please provide a key in order to notify the suite."
-                )
-            }
-            return HttpResponseBadRequest(json.dumps(response))
+            errors["errors"].append(
+                {
+                    "message": (
+                        "Bad Request: 'api_key' field missing. "
+                        "Please provide a key in order to notify the suite."
+                    )
+                }
+            )
+            return HttpResponseBadRequest(json.dumps(errors))
         elif received_key != settings.BOARDAGENDAS_API_KEY:
-            response = {
-                "message": "Unauthorized: Invalid api key. "
-                "Double check the key submitted."
-            }
-            return HttpResponse(json.dumps(response), status=401)
+            errors["errors"].append(
+                {
+                    "message": (
+                        "Unauthorized: Invalid api key. Double check the key submitted."
+                    )
+                }
+            )
+            return HttpResponse(status=401, content=json.dumps(errors))
 
-        # Validate fields
-        defaults = {
-            "document_id": data.get("document_id"),
-            "title": data.get("title"),
-            "source_url": data.get("source_url"),
-            "created_at": data.get("created_at"),  # YYYY-MM-DD
-            "document_type": data.get("document_type"),
-            "entity_type": data.get("entity_type"),
-            "entity_id": data.get("entity_id"),
-        }
+        # Check presence of documents
+        documents_data = data.get("documents")
+        if not documents_data:
+            errors["errors"].append(
+                {
+                    "message": (
+                        "Bad Request: 'documents' field missing. "
+                        "Please provide a list of documents."
+                    )
+                }
+            )
+            return HttpResponseBadRequest(json.dumps(errors))
 
-        missing_keys = [key for key in defaults.keys() if defaults[key] in [None, ""]]
-        if missing_keys:
-            response = {
-                "message": (
-                    "Bad Request: Missing attributes. "
-                    "Please provide the following field values - "
-                    f"{', '.join(missing_keys)}"
-                )
-            }
-            return HttpResponseBadRequest(json.dumps(response))
+        # Validate document fields
+        missing_values = []
+        expected_fields = [
+            "title",
+            "source_url",
+            "created_at",  # YYYY-MM-DD
+            "updated_at",  # YYYY-MM-DD
+            "document_type",
+            "document_id",
+            "entity_type",
+            "entity_id",
+        ]
+        for doc_details in documents_data:
+            missing_values.extend(
+                [f for f in expected_fields if doc_details.get(f) in [None, ""]]
+            )
 
-        # Create document
-        new_doc, doc_created = Document.objects.update_or_create(
-            document_id=data["document_id"], defaults=defaults
-        )
+        missing_values = set(missing_values)
+        if len(set(missing_values)) > 0:
+            errors["errors"].append(
+                {
+                    "message": (
+                        "Bad Request: Some documents had fields/values missing. "
+                        "Ensure the following fields are populated in each document - "
+                        f"{', '.join(missing_values)}"
+                    )
+                }
+            )
+            return HttpResponseBadRequest(json.dumps(errors))
+
+        # Create/update documents
+        num_created = 0
+        num_updated = 0
+        for doc_details in documents_data:
+            doc_obj, doc_created = Document.objects.update_or_create(
+                document_id=doc_details["document_id"], defaults=doc_details
+            )
+            num_created += 1 if doc_created else 0
+            num_updated += 1 if not doc_created else 0
 
         # Respond
-        if doc_created:
-            response = {
-                "status": 201,
-                "content": json.dumps(
-                    {"status": "Created", "message": "New document created and saved."}
-                ),
-            }
-        else:
-            response = {
-                "status": 200,
-                "content": json.dumps(
-                    {"status": "Success", "message": "Existing document updated."}
-                ),
-            }
+        response = {
+            "status": 201,
+            "content": json.dumps(
+                {
+                    "message": (
+                        "Success: "
+                        f"Document(s) created - {num_created}; "
+                        f"Document(s) updated - {num_updated}"
+                    )
+                }
+            ),
+        }
 
         return HttpResponse(**response)
 
