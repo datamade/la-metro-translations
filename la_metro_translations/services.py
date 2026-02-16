@@ -171,11 +171,7 @@ class MistralOCRService:
     @staticmethod
     def process_pages(pages: List[dict]) -> str:
         """
-        Reinserts tables and images into the markdown of each page.
-
-        TODO: try to reinsert hyperlinks
-        there's no way to find out where the links used to exist within
-        the original document, outside of what page it existed in
+        Reinserts tables, images, and links into the markdown of each page.
         """
 
         doc_text = ""
@@ -186,7 +182,7 @@ class MistralOCRService:
             # Unescaped dollar signs cause unintended math formatting
             markdown = markdown.replace("$", "\\$")
 
-            # Insert extracted tables and images
+            # Insert extracted tables, images, and links
             for table in page["tables"]:
                 table_content = table["content"]
 
@@ -200,6 +196,13 @@ class MistralOCRService:
                 markdown = markdown.replace(
                     f"({image['id']})", f"({image['image_base64']})"
                 )
+
+            if len(page["hyperlinks"]) > 0:
+                # Add links to the end of each page,
+                # since Mistral does not provide placeholders for extracted links
+                markdown += "\n\nRelevant hyperlinks:"
+                for i, link in enumerate(page["hyperlinks"]):
+                    markdown += f"\n- Hyperlink {i+1}: {link}"
 
             doc_text += f"{markdown}\n\nEnd of Page {page['index']+1}\n\n"
 
