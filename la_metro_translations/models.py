@@ -90,3 +90,124 @@ class ExampleModelDetailPage(DetailPage):
         context = super().get_context(request, *args, **kwargs)
         # Add additional context for your template, if needed.
         return context
+
+
+class Document(models.Model):
+    """
+    Details on an original source document.
+    """
+
+    DOCUMENT_TYPE_CHOICES = [
+        ("event_document", "EventDocument"),
+        ("bill_document", "BillDocument"),
+    ]
+    ENTITY_TYPE_CHOICES = [
+        ("event", "Event"),
+        ("bill", "Bill"),
+    ]
+
+    title = models.CharField()
+    source_url = models.URLField(help_text="Link to the original pdf document.")
+    created_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text=(
+            "Date this original document was created, as per the BoardAgendas app."
+        ),
+    )
+    updated_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text=(
+            "Date this original document was updated, as per the BoardAgendas app."
+        ),
+    )
+    document_type = models.CharField(
+        choices=DOCUMENT_TYPE_CHOICES, blank=True, null=True
+    )
+    document_id = models.CharField(
+        blank=True,
+        null=True,
+        help_text="Primary key of this document in the BoardAgendas app.",
+    )
+    entity_type = models.CharField(choices=ENTITY_TYPE_CHOICES, blank=True, null=True)
+    entity_id = models.CharField(
+        blank=True,
+        null=True,
+        help_text="Primary key of this entity in the BoardAgendas app.",
+    )
+
+
+class DocumentContent(models.Model):
+    """
+    The extracted, untranslated content from a document, saved as markdown.
+    """
+
+    APPROVAL_STATUS_CHOICES = [
+        ("approved", "Approved for Publishing"),
+        ("waiting", "Waiting for Initial Review"),
+        ("revision", "Needs Revision"),
+    ]
+
+    markdown = models.TextField()
+    approval_status = models.CharField(
+        choices=APPROVAL_STATUS_CHOICES, default="waiting"
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True, help_text="Date this content was created in this app."
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True, help_text="Date this content was last updated in this app."
+    )
+    document = models.OneToOneField(
+        Document, on_delete=models.CASCADE, related_name="content"
+    )
+
+
+class DocumentTranslation(models.Model):
+    """
+    The translated version of a document's extracted content.
+    """
+
+    LANGUAGE_CHOICES = [
+        ("english", "English"),
+        ("spanish", "Spanish"),
+    ]
+    APPROVAL_STATUS_CHOICES = [
+        ("approved", "Approved for Publishing"),
+        ("waiting", "Waiting for Initial Review"),
+        ("revision", "Needs Revision"),
+    ]
+
+    markdown = models.TextField()
+    language = models.CharField(choices=LANGUAGE_CHOICES)
+    approval_status = models.CharField(
+        choices=APPROVAL_STATUS_CHOICES, default="waiting"
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True, help_text="Date this translation was created in this app."
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True, help_text="Date this translation was last updated in this app."
+    )
+    document_content = models.ForeignKey(
+        DocumentContent, on_delete=models.CASCADE, related_name="translations"
+    )
+
+
+class TranslationFile(models.Model):
+    """
+    A version of a document's translation, uploaded to cloud storage.
+    """
+
+    FORMAT_CHOICES = [
+        ("md", "md"),
+        ("rtf", "rtf"),
+        ("pdf", "pdf"),
+    ]
+
+    format = models.CharField(choices=FORMAT_CHOICES)
+    url = models.URLField(blank=True, null=True)
+    document_translation = models.ForeignKey(
+        DocumentTranslation, on_delete=models.CASCADE, related_name="files"
+    )
