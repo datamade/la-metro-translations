@@ -6,6 +6,7 @@ import logging
 from typing import Union, List, Generator
 from abc import ABC, abstractmethod
 from io import StringIO
+from datetime import datetime
 
 from django.conf import settings
 from django.db.models import QuerySet
@@ -60,7 +61,9 @@ class MistralOCRService:
         return doc_text
 
     @staticmethod
-    def batch_extract(documents: Union[QuerySet, List[Document]]) -> Generator[dict]:
+    def batch_extract(
+        documents: Union[QuerySet, List[Document]],
+    ) -> Generator[dict] | None:
         """
         OCR multiple documents using a batch job request,
         and return the responses.
@@ -85,28 +88,31 @@ class MistralOCRService:
             batch_file.write(json.dumps(entry) + "\n")
 
         # Upload batch file
-        # TODO: uniquely name these files
-        batch_file_name = "tester1.jsonl"
+        batch_timestamp = datetime.now().strftime("batch__%Y-%m-%d__%H-%M")
         batch_data = client.files.upload(
-            file={"file_name": batch_file_name, "content": batch_file.getvalue()},
+            file={
+                "file_name": f"{batch_timestamp}.jsonl",
+                "content": batch_file.getvalue(),
+            },
             purpose="batch",
         )
         batch_file.close()
 
-        # Create/start batch job
+        # Create and start batch job
+        timeout_hours = 23
         created_job = client.batch.jobs.create(
             input_files=[batch_data.id],
             model="mistral-ocr-latest",
             endpoint="/v1/ocr",
+            timeout_hours=timeout_hours,
         )
 
         retrieved_job = client.batch.jobs.get(job_id=created_job.id)
         check_interval = 30
 
-        logger.info(f"Job sent. Current status: {retrieved_job.status}")
         logger.info(
-            f"Job status will be refreshed every {check_interval} "
-            "seconds until complete."
+            "Batch job created! It will be checked every "
+            f"{check_interval} seconds until complete..."
         )
 
         while retrieved_job.status in ["QUEUED", "RUNNING"]:
@@ -117,35 +123,50 @@ class MistralOCRService:
             failed_reqs = retrieved_job.failed_requests
 
             logger.info(f"Status: {retrieved_job.status}")
-            logger.info(f"Total requests: {total_reqs}")
-            logger.info(f"Successful requests: {succeeded_reqs}")
-            logger.info(f"Failed requests: {failed_reqs}")
+            logger.info(f"Successful requests: {succeeded_reqs} out of {total_reqs}")
+            logger.info(f"Failed requests: {failed_reqs} out of {total_reqs}")
             logger.info(
                 "Percent done: "
                 f"{round((succeeded_reqs + failed_reqs) / total_reqs, 4) * 100}%"
             )
+            minutes_elapsed = {time.time() - start_time} / 60
 
-            if retrieved_job.status not in ["QUEUED", "RUNNING"]:
-                break
-            else:
-                logger.info(f"Checking again in {check_interval} seconds")
-                logger.info("=====")
+            if retrieved_job.status in ["QUEUED", "RUNNING"]:
+                logger.info(f"Time elapsed: {minutes_elapsed} minutes...")
+                logger.info("=======")
+
+        if retrieved_job.status == "TIMEOUT_EXCEEDED":
+            logger.error(
+                f"Batch job exceeded timeout of {timeout_hours} hours."
+                f"Job id: {created_job.id}"
+            )
+            return
+        elif retrieved_job.status != "SUCCESS":
+            logger.error(
+                f"Batch job has stopped with status: {retrieved_job.status}"
+                f"Job id: {created_job.id}"
+            )
+            return
 
         logger.info("Downloading file(s)...")
         response = client.files.download(file_id=retrieved_job.output_file)
-        logger.info(
-            "--- Downloaded! Job took %s seconds to complete. ---"
-            % (time.time() - start_time)
-        )
+        logger.info(f"--- Batch job finished in {minutes_elapsed} seconds. ---")
 
+        # Standardize output
         for line in response.iter_lines():
-            result = json.loads(line)
+            extraction_response = json.loads(line)
             full_markdown = MistralOCRService.process_pages(
-                result["response"]["body"]["pages"]
+                extraction_response["response"]["body"]["pages"]
             )
-            result["response"]["body"]["full_markdown"] = full_markdown
+            document_type = extraction_response["custom_id"].split(":")[0]
+            document_id = extraction_response["custom_id"].split(":")[1]
+            extraction = {
+                "document_type": document_type,
+                "document_id": document_id,
+                "markdown": full_markdown,
+            }
 
-            yield result
+            yield extraction
 
     @staticmethod
     def process_pages(pages: List[dict]) -> str:
