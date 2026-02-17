@@ -34,7 +34,7 @@ class Command(BaseCommand):
 
         extractions = MistralOCRService.batch_extract(documents)
         contents_created = 0
-        contents_skipped = 0
+        extractions_skipped = 0
 
         for result in extractions:
             try:
@@ -48,7 +48,7 @@ class Command(BaseCommand):
                     f"document_type={result['document_type']} and "
                     f"document_id={result['document_id']}; Skipping..."
                 )
-                contents_skipped += 1
+                extractions_skipped += 1
                 continue
 
             document_content = DocumentContent.objects.create(
@@ -67,6 +67,14 @@ class Command(BaseCommand):
             contents_created += 1
             # TODO: create rtf and md versions of the file, upload to s3, store urls
 
-        logger.info(f"DocumentContents w/related objects created: {contents_created}")
-        logger.info(f"DocumentContents skipped: {contents_skipped}")
+        failed_documents = documents.filter(content__isnull=True)
+        logger.info(f"Documents with new related content objects: {contents_created}")
+        if extractions_skipped:
+            logger.error(f"Extractions w/o matching documents: {extractions_skipped}")
+        if len(failed_documents):
+            logger.error(
+                "Documents that still do not have content objects: "
+                f"{len(failed_documents)}"
+            )
+
         logger.info("--- Finished! ---")

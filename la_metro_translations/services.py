@@ -135,16 +135,21 @@ class MistralOCRService:
                 logger.info(f"Time elapsed: {minutes_elapsed} minutes...")
                 logger.info("=======")
 
+        # Check response for issues
+        if retrieved_job.errors:
+            logger.error(f"Errors: {retrieved_job.errors}")
+
         if retrieved_job.status == "TIMEOUT_EXCEEDED":
             logger.error(
                 f"Batch job exceeded timeout of {timeout_hours} hours."
-                f"Job id: {created_job.id}"
+                f"Job ID: {created_job.id}"
             )
             return
-        elif retrieved_job.status != "SUCCESS":
+        elif retrieved_job.status != "SUCCESS" or not retrieved_job.output_file:
             logger.error(
-                f"Batch job has stopped with status: {retrieved_job.status}"
-                f"Job id: {created_job.id}"
+                f"Batch job has stopped without an output file. "
+                f"Status: {retrieved_job.status}; "
+                f"Job ID: {created_job.id}"
             )
             return
 
