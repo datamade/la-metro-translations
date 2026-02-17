@@ -272,7 +272,16 @@ for host in ALLOWED_HOSTS:
 
     CSRF_TRUSTED_ORIGINS.append(origin)
 
+# Set up third party sercices
 try:
     MISTRAL_API_KEY = os.environ["MISTRAL_API_KEY"]
 except KeyError:
     print("Please enter a Mistral api key in order to enable OCR and translation.")
+
+try:
+    BOARDAGENDAS_API_KEY = os.environ["BOARDAGENDAS_API_KEY"]
+except KeyError:
+    print(
+        "Please enter the BoardAgendas api key in order to "
+        "accept notifications of new documents from that app."
+    )

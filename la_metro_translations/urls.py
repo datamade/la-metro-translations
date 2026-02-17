@@ -12,6 +12,11 @@ urlpatterns = [
     path("django-admin/", admin.site.urls),
     path("admin/", include(wagtailadmin_urls)),
     path("documents/", include(wagtaildocs_urls)),
+    path(
+        "api/update-documents/",
+        views.UpdateDocumentsWebhook.as_view(),
+        name="update_documents",
+    ),
     path("robots.txt/", views.robots_txt),
 ]
 
