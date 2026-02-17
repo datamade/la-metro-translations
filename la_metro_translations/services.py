@@ -108,7 +108,7 @@ class MistralOCRService:
         )
 
         retrieved_job = client.batch.jobs.get(job_id=created_job.id)
-        check_interval = 30
+        check_interval = 60
 
         logger.info(
             "Batch job created! It will be checked every "
@@ -127,9 +127,9 @@ class MistralOCRService:
             logger.info(f"Failed requests: {failed_reqs} out of {total_reqs}")
             logger.info(
                 "Percent done: "
-                f"{round((succeeded_reqs + failed_reqs) / total_reqs, 4) * 100}%"
+                f"{round((succeeded_reqs + failed_reqs) / total_reqs, 1) * 100}%"
             )
-            minutes_elapsed = {time.time() - start_time} / 60
+            minutes_elapsed = round((time.time() - start_time) / 60, 1)
 
             if retrieved_job.status in ["QUEUED", "RUNNING"]:
                 logger.info(f"Time elapsed: {minutes_elapsed} minutes...")
@@ -150,7 +150,7 @@ class MistralOCRService:
 
         logger.info("Downloading file(s)...")
         response = client.files.download(file_id=retrieved_job.output_file)
-        logger.info(f"--- Batch job finished in {minutes_elapsed} seconds. ---")
+        logger.info(f"--- Batch job finished in {minutes_elapsed} minutes. ---")
 
         # Standardize output
         for line in response.iter_lines():
