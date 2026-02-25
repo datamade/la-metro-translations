@@ -94,6 +94,7 @@ INSTALLED_APPS = [
     "wagtail.search",
     "wagtail.admin",
     "wagtail",
+    "rest_framework",
     "modelcluster",
     "taggit",
     "webpack_loader",

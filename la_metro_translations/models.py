@@ -109,31 +109,21 @@ class Document(models.Model):
     title = models.CharField()
     source_url = models.URLField(help_text="Link to the original pdf document.")
     created_at = models.DateTimeField(
-        blank=True,
-        null=True,
         help_text=(
             "Date this original document was created, as per the BoardAgendas app."
         ),
     )
     updated_at = models.DateTimeField(
-        blank=True,
-        null=True,
         help_text=(
             "Date this original document was updated, as per the BoardAgendas app."
         ),
     )
-    document_type = models.CharField(
-        choices=DOCUMENT_TYPE_CHOICES, blank=True, null=True
-    )
+    document_type = models.CharField(choices=DOCUMENT_TYPE_CHOICES)
     document_id = models.CharField(
-        blank=True,
-        null=True,
         help_text="Primary key of this document in the BoardAgendas app.",
     )
-    entity_type = models.CharField(choices=ENTITY_TYPE_CHOICES, blank=True, null=True)
+    entity_type = models.CharField(choices=ENTITY_TYPE_CHOICES)
     entity_id = models.CharField(
-        blank=True,
-        null=True,
         help_text="Primary key of this entity in the BoardAgendas app.",
     )
 

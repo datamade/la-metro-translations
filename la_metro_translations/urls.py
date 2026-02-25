@@ -7,6 +7,7 @@ from wagtail import urls as wagtail_urls
 from wagtail.documents import urls as wagtaildocs_urls
 
 from la_metro_translations import views
+from la_metro_translations.api import views as api_views
 
 urlpatterns = [
     path("django-admin/", admin.site.urls),
@@ -14,7 +15,7 @@ urlpatterns = [
     path("documents/", include(wagtaildocs_urls)),
     path(
         "api/update-documents/",
-        views.UpdateDocumentsWebhook.as_view(),
+        api_views.DocumentUpdateView.as_view(),
         name="update_documents",
     ),
     path("robots.txt/", views.robots_txt),
