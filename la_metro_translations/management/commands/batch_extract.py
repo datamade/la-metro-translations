@@ -37,7 +37,7 @@ class Command(BaseCommand):
         else:
             logger.info(f"Performing OCR on {len(documents)} Document(s)...")
 
-        extractions = MistralOCRService.batch_extract(documents)
+        extractions = MistralOCRService.metered_batch_extract(documents)
         contents_updated = 0
 
         for result in extractions:

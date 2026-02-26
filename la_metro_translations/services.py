@@ -2,6 +2,7 @@ import json
 import re
 import time
 import logging
+import requests
 
 from typing import Union, List, Generator
 from abc import ABC, abstractmethod
@@ -65,7 +66,7 @@ class MistralOCRService:
         documents: Union[QuerySet, List[Document]],
     ) -> Generator[dict] | None:
         """
-        OCR multiple documents using a batch job request,
+        Create a single batch job request to OCR multiple documents,
         and return the responses.
         """
         start_time = time.time()
@@ -212,6 +213,36 @@ class MistralOCRService:
             doc_text += f"{markdown}\n\nEnd of Page {page['index']+1}\n\n"
 
         return doc_text
+
+    @staticmethod
+    def metered_batch_extract(
+        documents: Union[QuerySet, List[Document]],
+    ) -> Generator[dict] | None:
+        """
+        Create multiple batch job requests to OCR documents, and return the responses.
+        The batches are split up when the total file size of the contents in the urls
+        reaches a set maximum.
+        """
+        max_batch_size = 30000000  # 30MB
+        curr_batch_size = 0
+        curr_batch = []
+        batch_num = 1
+
+        for i, doc in enumerate(documents):
+            # Check file size
+            res = requests.head(doc.source_url)
+            curr_batch_size += int(res.headers["Content-Length"])
+            curr_batch.append(doc)
+
+            # Send batch if we've exceeded max file size or at the end of the list
+            if curr_batch_size >= max_batch_size or i + 1 >= len(documents):
+                logger.info(
+                    f"Processing batch #{batch_num} with {len(curr_batch)} documents..."
+                )
+                yield from MistralOCRService.batch_extract(curr_batch)
+                curr_batch_size = 0
+                curr_batch = []
+                batch_num += 1
 
 
 class TranslationService(ABC):
