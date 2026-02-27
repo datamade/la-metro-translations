@@ -127,6 +127,14 @@ class Document(models.Model):
         help_text="Primary key of this entity in the BoardAgendas app.",
     )
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["document_type", "document_id"],
+                name="unique_document",
+            )
+        ]
+
 
 class DocumentContent(models.Model):
     """
@@ -184,6 +192,14 @@ class DocumentTranslation(models.Model):
         DocumentContent, on_delete=models.CASCADE, related_name="translations"
     )
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["document_content", "language"],
+                name="unique_translation",
+            )
+        ]
+
 
 class TranslationFile(models.Model):
     """
@@ -201,3 +217,11 @@ class TranslationFile(models.Model):
     document_translation = models.ForeignKey(
         DocumentTranslation, on_delete=models.CASCADE, related_name="files"
     )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["document_translation", "format"],
+                name="unique_file",
+            )
+        ]
