@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils.html import format_html
 
 from wagtail import blocks
 from wagtail.images.blocks import ImageChooserBlock
@@ -127,6 +128,27 @@ class Document(models.Model):
         help_text="Primary key of this entity in the BoardAgendas app.",
     )
 
+    def __str__(self):
+        return self.title
+
+    class Meta:
+        ordering = ['entity_type', 'title']
+        
+    def entity_display(self):
+        if self.entity_type:
+            return self.get_entity_type_display()
+        return '-'
+    
+    entity_display.short_description = 'Entity'
+
+    def updated_at_display(self):
+        if self.updated_at:
+            return self.updated_at.strftime('%Y-%m-%d %H:%M')
+        return '-'
+    
+    updated_at_display.short_description = 'Last updated'
+
+
 
 class DocumentContent(models.Model):
     """
@@ -152,6 +174,46 @@ class DocumentContent(models.Model):
     document = models.OneToOneField(
         Document, on_delete=models.CASCADE, related_name="content"
     )
+
+    def __str__(self):
+        return f"{self.document.title} - Content"
+
+    class Meta:
+        ordering = ['-updated_at']
+        
+    def document_title(self):
+        return self.document.title
+    document_title.short_description = 'Document Name'
+
+    def approval_status_display(self):
+        status_colors = {
+            'approved': 'green',
+            'waiting': 'orange',
+            'revision': 'red'
+        }
+        color = status_colors.get(self.approval_status, 'gray')
+        return format_html(
+            '<span style="color: {}; font-weight: bold;">{}</span>',
+            color,
+            self.get_approval_status_display()
+        )
+    approval_status_display.short_description = 'Approval Status'
+
+    def entity_display(self):
+        if self.document.entity_type:
+            return self.document.get_entity_type_display()
+        return '-'
+    entity_display.short_description = 'Entity'
+
+    def document_updated_display(self):
+        if self.document.updated_at:
+            return self.document.updated_at.strftime('%Y-%m-%d %H:%M')
+        return '-'
+    document_updated_display.short_description = 'Document Updated'
+
+    def content_updated_display(self):
+        return self.updated_at.strftime('%Y-%m-%d %H:%M')
+    content_updated_display.short_description = 'Content Updated'
 
 
 class DocumentTranslation(models.Model):
@@ -183,6 +245,42 @@ class DocumentTranslation(models.Model):
     document_content = models.ForeignKey(
         DocumentContent, on_delete=models.CASCADE, related_name="translations"
     )
+
+    def __str__(self):
+        return f"{self.document_content.document.title} - {self.get_language_display()}"
+
+    class Meta:
+        ordering = ['-updated_at']
+        
+    def document_title(self):
+        return self.document_content.document.title
+    document_title.short_description = 'Document Name'
+
+    def language_display(self):
+        return self.get_language_display()
+    language_display.short_description = 'Language'
+
+    def approval_status_display(self):
+        status_colors = {
+            'approved': 'green',
+            'waiting': 'orange',
+            'revision': 'red'
+        }
+        color = status_colors.get(self.approval_status, 'gray')
+        return format_html(
+            '<span style="color: {}; font-weight: bold;">{}</span>',
+            color,
+            self.get_approval_status_display()
+        )
+    approval_status_display.short_description = 'Approval Status'
+
+    def content_updated_display(self):
+        return self.document_content.updated_at.strftime('%Y-%m-%d %H:%M')
+    content_updated_display.short_description = 'Content Updated'
+
+    def translation_updated_display(self):
+        return self.updated_at.strftime('%Y-%m-%d %H:%M')
+    translation_updated_display.short_description = 'Translation Updated'
 
 
 class TranslationFile(models.Model):

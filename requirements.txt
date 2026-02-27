@@ -13,3 +13,4 @@ wagtail==7.2.1
 whitenoise==6.11.0
 mistralai==1.10.0
 djangorestframework==3.16.1
+django-filter==24.3
