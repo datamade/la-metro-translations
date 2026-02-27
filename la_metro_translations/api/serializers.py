@@ -1,5 +1,6 @@
 from django.conf import settings
 from rest_framework import serializers
+from rest_framework.validators import UniqueTogetherValidator
 
 from la_metro_translations.models import Document
 
@@ -14,12 +15,21 @@ class DocumentSerializer(serializers.ModelSerializer):
         fields = [
             "title",
             "source_url",
-            "created_at",  # YYYY-MM-DD
-            "updated_at",  # YYYY-MM-DD
+            "created_at",
+            "updated_at",
             "document_type",
             "document_id",
             "entity_type",
             "entity_id",
+        ]
+
+    def get_validators(self):
+        # Turn off the unqiue constraint validator here
+        # in order to let bulk_create's update_conflicts flag to work properly
+        return [
+            v
+            for v in super().get_validators()
+            if not isinstance(v, UniqueTogetherValidator)
         ]
 
 

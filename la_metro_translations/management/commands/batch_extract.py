@@ -38,30 +38,69 @@ class Command(BaseCommand):
             logger.info(f"Performing OCR on {len(documents)} Document(s)...")
 
         extractions = MistralOCRService.metered_batch_extract(documents)
-        contents_updated = 0
 
-        for result in extractions:
-            document = Document.objects.get(
-                document_type=result["document_type"],
-                document_id=result["document_id"],
+        # Update DocumentContents
+        contents_to_upsert = []
+        for doc in documents:
+            curr_extraction = next(
+                (
+                    extr
+                    for extr in extractions
+                    if extr["document_type"] == doc.document_type
+                    and extr["document_id"] == doc.document_id
+                ),
+                None,
             )
-            document_content, _ = DocumentContent.objects.update_or_create(
-                document=document, defaults={"markdown": result["markdown"]}
+
+            if not curr_extraction:
+                continue
+
+            contents_to_upsert.append(
+                DocumentContent(document=doc, markdown=curr_extraction["markdown"])
             )
-            english_translation, _ = DocumentTranslation.objects.update_or_create(
-                document_content=document_content,
-                language="english",
-                defaults={"markdown": document_content.markdown},
+        new_contents = DocumentContent.objects.bulk_create(
+            contents_to_upsert,
+            update_conflicts=True,
+            unique_fields=["document"],
+            update_fields=["markdown"],
+        )
+
+        # Update English DocumentTranslations
+        english_translations_to_upsert = []
+        for content in new_contents:
+            english_translations_to_upsert.append(
+                DocumentTranslation(
+                    document_content=content,
+                    language="english",
+                    markdown=content.markdown,
+                )
             )
-            TranslationFile.objects.update_or_create(
-                format="pdf",
-                url=document.source_url,
-                document_translation=english_translation,
+        new_english_translations = DocumentTranslation.objects.bulk_create(
+            english_translations_to_upsert,
+            update_conflicts=True,
+            unique_fields=["document_content", "language"],
+            update_fields=["markdown"],
+        )
+
+        # Update TranslationFiles
+        files_to_upsert = []
+        for translation in new_english_translations:
+            files_to_upsert.append(
+                TranslationFile(
+                    document_translation=translation,
+                    url=translation.document_content.document.source_url,
+                    format="pdf",
+                )
             )
-            contents_updated += 1
+        TranslationFile.objects.bulk_create(
+            files_to_upsert,
+            update_conflicts=True,
+            unique_fields=["document_translation", "format"],
+            update_fields=["url"],
+        )
 
         logger.info(
             "Documents with new related content objects: "
-            f"{contents_updated} out of {len(documents)}"
+            f"{len(new_contents)} out of {len(documents)}"
         )
         logger.info("--- Finished! ---")
