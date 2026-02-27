@@ -97,6 +97,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "modelcluster",
     "taggit",
+    "django_filters",
     "webpack_loader",
     "la_metro_translations",
     "storages",

@@ -1,0 +1,63 @@
+{% extends "wagtailadmin/generic/edit.html" %}
+{% load wagtailadmin_tags %}
+
+{% block content %}
+    {{ block.super }}
+
+    {% if object and source_url %}
+        <div class="w-full mt-6">
+            <div class="nice-padding">
+                <div class="p-4 bg-blue-50 rounded">
+                    <h3 class="font-bold mb-2">Related Links</h3>
+                    <div class="flex gap-2">
+                        <a href="{{ source_url }}" target="_blank" class="button button-small button-secondary">
+                            View Source Document
+                        </a>
+                        <a href="{% url 'document:edit' object.document.pk %}" class="button button-small">
+                            View Document Details
+                        </a>
+                    </div>
+                </div>
+
+                {% if translations %}
+                    <div class="mt-4">
+                        <h3 class="font-bold mb-2">Available Translations</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {% for translation in translations %}
+                                {% if translation.language != 'english' %}
+                                    <div class="p-3 bg-green-50 rounded">
+                                        <h4 class="font-semibold">{{ translation.get_language_display }}</h4>
+                                        <p class="text-sm">
+                                            <span class="status-badge status-{{ translation.approval_status }}">
+                                                {{ translation.get_approval_status_display }}
+                                            </span>
+                                        </p>
+                                        <p class="text-sm text-gray-600">Updated: {{ translation.updated_at|date:"Y-m-d H:i" }}</p>
+                                        <div class="mt-2">
+                                            <a href="{% url 'document_translation:edit' translation.pk %}" class="button button-small button-secondary">
+                                                Edit
+                                            </a>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <style>
+            .status-badge {
+                padding: 0.25rem 0.5rem;
+                border-radius: 3px;
+                font-size: 0.75rem;
+                font-weight: bold;
+                text-transform: uppercase;
+            }
+            .status-approved { background-color: #d4edda; color: #155724; }
+            .status-waiting { background-color: #fff3cd; color: #856404; }
+            .status-revision { background-color: #f8d7da; color: #721c24; }
+        </style>
+    {% endif %}
+{% endblock %}
