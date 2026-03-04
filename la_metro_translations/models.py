@@ -100,6 +100,7 @@ class Document(models.Model):
     DOCUMENT_TYPE_CHOICES = [
         ("event_document", "EventDocument"),
         ("bill_document", "BillDocument"),
+        ("bill_version", "BillVersion"),
     ]
     ENTITY_TYPE_CHOICES = [
         ("event", "Event"),
