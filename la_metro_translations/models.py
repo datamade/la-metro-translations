@@ -100,6 +100,7 @@ class Document(models.Model):
     DOCUMENT_TYPE_CHOICES = [
         ("event_document", "EventDocument"),
         ("bill_document", "BillDocument"),
+        ("bill_version", "BillVersion"),
     ]
     ENTITY_TYPE_CHOICES = [
         ("event", "Event"),
@@ -109,33 +110,31 @@ class Document(models.Model):
     title = models.CharField()
     source_url = models.URLField(help_text="Link to the original pdf document.")
     created_at = models.DateTimeField(
-        blank=True,
-        null=True,
         help_text=(
             "Date this original document was created, as per the BoardAgendas app."
         ),
     )
     updated_at = models.DateTimeField(
-        blank=True,
-        null=True,
         help_text=(
             "Date this original document was updated, as per the BoardAgendas app."
         ),
     )
-    document_type = models.CharField(
-        choices=DOCUMENT_TYPE_CHOICES, blank=True, null=True
-    )
+    document_type = models.CharField(choices=DOCUMENT_TYPE_CHOICES)
     document_id = models.CharField(
-        blank=True,
-        null=True,
         help_text="Primary key of this document in the BoardAgendas app.",
     )
-    entity_type = models.CharField(choices=ENTITY_TYPE_CHOICES, blank=True, null=True)
+    entity_type = models.CharField(choices=ENTITY_TYPE_CHOICES)
     entity_id = models.CharField(
-        blank=True,
-        null=True,
         help_text="Primary key of this entity in the BoardAgendas app.",
     )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["document_type", "document_id"],
+                name="unique_document",
+            )
+        ]
 
 
 class DocumentContent(models.Model):
@@ -194,6 +193,14 @@ class DocumentTranslation(models.Model):
         DocumentContent, on_delete=models.CASCADE, related_name="translations"
     )
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["document_content", "language"],
+                name="unique_translation",
+            )
+        ]
+
 
 class TranslationFile(models.Model):
     """
@@ -211,3 +218,11 @@ class TranslationFile(models.Model):
     document_translation = models.ForeignKey(
         DocumentTranslation, on_delete=models.CASCADE, related_name="files"
     )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["document_translation", "format"],
+                name="unique_file",
+            )
+        ]
