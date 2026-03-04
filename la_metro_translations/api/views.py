@@ -14,6 +14,8 @@ class DocumentUpdateView(APIView):
     def post(self, request):
         serializer = NotificationSerializer(data=request.data)
         if not serializer.is_valid():
+            if serializer.errors.get("api_key"):
+                return Response(serializer.errors, status=status.HTTP_403_FORBIDDEN)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         cleaned_data = serializer.data
