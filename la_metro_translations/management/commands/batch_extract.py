@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 class Command(BaseCommand):
     """
-    Extract text from documents that need content, and create/update related objects."
+    Extract text from documents that need content, and create/update related objects.
     """
 
     help = (

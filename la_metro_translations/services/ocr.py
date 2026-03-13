@@ -1,11 +1,10 @@
 import json
+import re
 import logging
 import requests
-import time
 
 from typing import Union, List, Generator
-from io import StringIO
-from datetime import datetime
+from utils import BatchUtils
 
 from django.db.models import QuerySet
 from django.conf import settings
@@ -20,12 +19,13 @@ logger = logging.getLogger(__name__)
 
 class MistralOCRService:
     @staticmethod
-    def extract_text(document_url: str) -> str | None:
+    def extract_text(document: Document) -> str | None:
         """
         Passes a url for a document to Mistral's OCR service,
         and returns the document's extracted text
         """
         client = Mistral(api_key=settings.MISTRAL_API_KEY)
+        document_url = document.source_url
 
         try:
             ocr_response = client.ocr.process(
@@ -56,7 +56,7 @@ class MistralOCRService:
             logger.warning("Unable to OCR. Skipping...")
             return
 
-        doc_text = MistralOCRService.process_pages(pages)
+        doc_text = MistralOCRService.process_pages(pages, document.document_type)
         return doc_text
 
     @staticmethod
@@ -67,103 +67,50 @@ class MistralOCRService:
         Create a single batch job request to OCR multiple documents,
         and return the responses.
         """
-        start_time = time.time()
         client = Mistral(api_key=settings.MISTRAL_API_KEY)
-
-        # Create batch file
-        batch_file = StringIO()
-        for doc in documents:
-            entry = {
-                "custom_id": f"{doc.document_type}:{doc.document_id}",
-                "body": {
-                    "document": {
-                        "type": "document_url",
-                        "document_url": doc.source_url,
-                    },
-                    "table_format": "markdown",
-                    "include_image_base64": True,
-                },
-            }
-            batch_file.write(json.dumps(entry) + "\n")
-
-        # Upload batch file
-        batch_timestamp = datetime.now().strftime("batch__%Y-%m-%d__%H-%M")
-        batch_data = client.files.upload(
-            file={
-                "file_name": f"{batch_timestamp}.jsonl",
-                "content": batch_file.getvalue(),
-            },
-            purpose="batch",
-        )
-        batch_file.close()
-
-        # Create and start batch job
         timeout_hours = 23
-        created_job = client.batch.jobs.create(
-            input_files=[batch_data.id],
+
+        # Create batch entries
+        entries = []
+        for doc in documents:
+            entries.append(
+                {
+                    "custom_id": f"{doc.document_type}:{doc.document_id}",
+                    "body": {
+                        "document": {
+                            "type": "document_url",
+                            "document_url": doc.source_url,
+                        },
+                        "table_format": "markdown",
+                        "include_image_base64": True,
+                    },
+                }
+            )
+
+        # Start batch job
+        created_job = BatchUtils.start_batch_job(
+            client=client,
+            entries=entries,
             model="mistral-ocr-latest",
             endpoint="/v1/ocr",
             timeout_hours=timeout_hours,
         )
 
-        retrieved_job = client.batch.jobs.get(job_id=created_job.id)
-        check_interval = 60
-
-        logger.info(
-            "Batch job created! It will be checked every "
-            f"{check_interval} seconds until complete..."
+        # Monitor batch job
+        response = BatchUtils.check_batch_job(
+            client=client, job_id=created_job.id, timeout_hours=timeout_hours
         )
-
-        while retrieved_job.status in ["QUEUED", "RUNNING"]:
-            time.sleep(check_interval)
-            retrieved_job = client.batch.jobs.get(job_id=created_job.id)
-            total_reqs = retrieved_job.total_requests
-            succeeded_reqs = retrieved_job.succeeded_requests
-            failed_reqs = retrieved_job.failed_requests
-
-            logger.info(f"Status: {retrieved_job.status}")
-            logger.info(f"Successful requests: {succeeded_reqs} out of {total_reqs}")
-            logger.info(f"Failed requests: {failed_reqs} out of {total_reqs}")
-            logger.info(
-                "Percent done: "
-                f"{round((succeeded_reqs + failed_reqs) / total_reqs, 1) * 100}%"
-            )
-            minutes_elapsed = round((time.time() - start_time) / 60, 1)
-
-            if retrieved_job.status in ["QUEUED", "RUNNING"]:
-                logger.info(f"Time elapsed: {minutes_elapsed} minutes...")
-                logger.info("=======")
-
-        # Check response for issues
-        if retrieved_job.errors:
-            logger.error(f"Errors: {retrieved_job.errors}")
-
-        if retrieved_job.status == "TIMEOUT_EXCEEDED":
-            logger.error(
-                f"Batch job exceeded timeout of {timeout_hours} hours."
-                f"Job ID: {created_job.id}"
-            )
+        if not response:
             return
-        elif retrieved_job.status != "SUCCESS" or not retrieved_job.output_file:
-            logger.error(
-                f"Batch job has stopped without an output file. "
-                f"Status: {retrieved_job.status}; "
-                f"Job ID: {created_job.id}"
-            )
-            return
-
-        logger.info("Downloading file(s)...")
-        response = client.files.download(file_id=retrieved_job.output_file)
-        logger.info(f"--- Batch job finished in {minutes_elapsed} minutes. ---")
 
         # Standardize output
         for line in response.iter_lines():
             extraction_response = json.loads(line)
-            full_markdown = MistralOCRService.process_pages(
-                extraction_response["response"]["body"]["pages"]
-            )
             document_type = extraction_response["custom_id"].split(":")[0]
             document_id = extraction_response["custom_id"].split(":")[1]
+            full_markdown = MistralOCRService.process_pages(
+                extraction_response["response"]["body"]["pages"], document_type
+            )
             extraction = {
                 "document_type": document_type,
                 "document_id": document_id,
@@ -173,7 +120,7 @@ class MistralOCRService:
             yield extraction
 
     @staticmethod
-    def process_pages(pages: List[dict]) -> str:
+    def process_pages(pages: List[dict], document_type: str) -> str:
         """
         Reinserts tables, images, and links into the markdown of each page.
         """
@@ -202,11 +149,82 @@ class MistralOCRService:
                 )
 
             if len(page["hyperlinks"]) > 0:
-                # Add links to the end of each page,
-                # since Mistral does not provide placeholders for extracted links
-                markdown += "\n\nRelevant hyperlinks:"
-                for i, link in enumerate(page["hyperlinks"]):
-                    markdown += f"\n- Hyperlink {i+1}: {link}"
+                """
+                Mistral's OCR model currently does not provide
+                placeholders for extracted links. However, it does list them
+                in the order it finds them. So we'll use patterns in documents
+                to put them back where they belong.
+
+                If the document is an agenda, reinsert attachment and bill links
+                directly onto their original text since those are made
+                using a set template/pattern.
+
+                If the document is a board report, append hyperlinks to the
+                end of each page since those do not have a pattern.
+                """
+
+                # Replace legistar link text when found
+                legistar_link = "http://www.legistar.com/"
+                if legistar_link in page["hyperlinks"]:
+                    legistar_text = "powered by Legistar™"
+                    full_legistar_tag = f"[{legistar_text}]({legistar_link})"
+                    markdown = markdown.replace(legistar_text, full_legistar_tag)
+                    page["hyperlinks"].remove(legistar_link)
+
+                if document_type == "event_document":
+                    # Blocks that start with "Attachments:", and end with newlines
+                    attmt_pattern = r"(?:\*\*)?Attachments:(?:\*\*)?\s*(.+?)(?=\n\n|$)"
+                    attmt_blocks = re.findall(attmt_pattern, markdown, re.DOTALL)
+
+                    # Text representing a board report link e.g. 2341-8907
+                    bill_pattern = r"(?:\s+)(\d{4}-\d{4})"
+                    bill_labels = re.findall(bill_pattern, markdown)
+
+                    # Separate attachment links and board report links
+                    attmt_links = []
+                    bill_links = []
+                    for link in page["hyperlinks"]:
+                        (
+                            bill_links.append(link)
+                            if "matter.aspx" in link
+                            else attmt_links.append(link)
+                        )
+
+                    # Process each big block of attachments as single labels
+                    for original_block in attmt_blocks:
+                        hyperlinked_block = original_block
+                        attmt_labels = original_block.split("\n")
+
+                        # Push new link tags into the temporary hyperlinked block
+                        for attmt_label in attmt_labels:
+                            full_attmt_tag = f"[{attmt_label}]({attmt_links[0]})"
+                            hyperlinked_block = hyperlinked_block.replace(
+                                attmt_label, full_attmt_tag
+                            )
+                            del attmt_links[0]
+
+                        # Push hyperlinked blocks into original markdown as a whole
+                        # to prevent identical blocks from having mismatched links
+                        markdown = markdown.replace(
+                            original_block, hyperlinked_block, 1
+                        )
+
+                    # Process board report labels
+                    for bill_label in bill_labels:
+                        full_bill_tag = f"[{bill_label}]({bill_links[0]})"
+                        markdown = markdown.replace(bill_label, full_bill_tag, 1)
+                        del bill_links[0]
+
+                    # Include any extra links that weren't matched
+                    if leftover_links := attmt_links + bill_links:
+                        markdown += "\n\nExtra links:"
+                        for i, link in enumerate(leftover_links):
+                            markdown += f"\n- Hyperlink {i+1}: {link}"
+                else:
+                    # For other document types, insert links at the end of each page
+                    markdown += "\n\nRelevant hyperlinks:"
+                    for i, link in enumerate(page["hyperlinks"]):
+                        markdown += f"\n- Hyperlink {i+1}: {link}"
 
             doc_text += f"{markdown}\n\nEnd of Page {page['index']+1}\n\n"
 
