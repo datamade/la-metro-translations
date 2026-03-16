@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 
 from django.core.management.base import BaseCommand
 from django.db.models import F
@@ -71,9 +72,10 @@ class Command(BaseCommand):
 
         # TODO: use metered_batch_translate() when that's written
         translations = MistralTranslationService.batch_translate(
-            contents, user_language
+            contents, [user_language]
         )
 
+        now = datetime.now()
         translations_to_upsert = []
         for content in contents:
             curr_translation = next(
@@ -94,6 +96,7 @@ class Command(BaseCommand):
                     document_content=content,
                     language=user_language,
                     markdown=curr_translation["markdown"],
+                    updated_at=now,
                 )
             )
 
@@ -101,7 +104,7 @@ class Command(BaseCommand):
             translations_to_upsert,
             update_conflicts=True,
             unique_fields=["document_content", "language"],
-            update_fields=["markdown"],
+            update_fields=["markdown", "updated_at"],
         )
 
         logger.info(

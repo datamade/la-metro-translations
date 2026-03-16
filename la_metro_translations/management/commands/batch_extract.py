@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 
 from django.core.management.base import BaseCommand
 from django.db.models import Q, F
@@ -25,7 +26,7 @@ class Command(BaseCommand):
         "DocumentContent, then create english DocumentTranslation and TranslationFiles."
     )
 
-    def handle(self, *args, **kwargs):
+    def handle(self, **options):
         # Get any documents without content, or
         # documents that have been updated more recently than their content.
         documents = Document.objects.filter(
@@ -38,6 +39,7 @@ class Command(BaseCommand):
             logger.info(f"Performing OCR on {len(documents)} Document(s)...")
 
         extractions = MistralOCRService.metered_batch_extract(documents)
+        now = datetime.now()
 
         # Update DocumentContents
         contents_to_upsert = []
@@ -56,13 +58,15 @@ class Command(BaseCommand):
                 continue
 
             contents_to_upsert.append(
-                DocumentContent(document=doc, markdown=curr_extraction["markdown"])
+                DocumentContent(
+                    document=doc, markdown=curr_extraction["markdown"], updated_at=now
+                )
             )
         new_contents = DocumentContent.objects.bulk_create(
             contents_to_upsert,
             update_conflicts=True,
             unique_fields=["document"],
-            update_fields=["markdown"],
+            update_fields=["markdown", "updated_at"],
         )
 
         # Update English DocumentTranslations
@@ -73,13 +77,14 @@ class Command(BaseCommand):
                     document_content=content,
                     language="english",
                     markdown=content.markdown,
+                    updated_at=now,
                 )
             )
         new_english_translations = DocumentTranslation.objects.bulk_create(
             english_translations_to_upsert,
             update_conflicts=True,
             unique_fields=["document_content", "language"],
-            update_fields=["markdown"],
+            update_fields=["markdown", "updated_at"],
         )
 
         # Update TranslationFiles
