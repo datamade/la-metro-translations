@@ -70,9 +70,8 @@ class Command(BaseCommand):
                 f"Translating {len(contents)} DocumentContent(s) to {user_language}..."
             )
 
-        # TODO: use metered_batch_translate() when that's written
-        translations = MistralTranslationService.batch_translate(
-            contents, [user_language]
+        translations = MistralTranslationService.metered_batch_translate(
+            contents, user_language
         )
 
         now = datetime.now()
