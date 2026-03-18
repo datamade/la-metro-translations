@@ -20,7 +20,10 @@ class Command(BaseCommand):
     """
 
     help = (
-        # TODO: fill out
+        "Translate all DocumentContents that either do not have a "
+        "related DocumentTranslation object in the specificed language, or "
+        "have been updated more recently than their DocumentTranslation for "
+        "that language, then upsert its DocumentTranslation."
     )
 
     def add_arguments(self, parser):
@@ -34,10 +37,6 @@ class Command(BaseCommand):
         )
 
     def handle(self, **options):
-        """
-        TODO: make this method just responsible for one language at a time,
-        and have a github action do the legwork of running this for multiple languages
-        """
         supported_languages = [
             choice[0]
             for choice in DocumentTranslation.LANGUAGE_CHOICES
@@ -52,7 +51,7 @@ class Command(BaseCommand):
             )
 
         # Get any document contents without translations in this language, or
-        # contents that have been updated more recently than their translations.
+        # contents that have been updated more recently than their translation.
         contents = (
             DocumentContent.objects.select_related("document")
             .exclude(
@@ -70,31 +69,30 @@ class Command(BaseCommand):
                 f"Translating {len(contents)} DocumentContent(s) to {user_language}..."
             )
 
-        translations = MistralTranslationService.metered_batch_translate(
-            contents, user_language
+        translations = list(
+            MistralTranslationService.metered_batch_translate(contents, user_language)
         )
 
         now = datetime.now()
         translations_to_upsert = []
         for content in contents:
-            curr_translation = next(
-                (
-                    translation
-                    for translation in translations
-                    if translation["document_type"] == content.document.document_type
+            matched_translation = {}
+            for translation in translations:
+                if (
+                    translation["document_type"] == content.document.document_type
                     and translation["document_id"] == content.document.document_id
-                ),
-                None,
-            )
+                ):
+                    matched_translation = translation
+                    break
 
-            if not curr_translation:
+            if not matched_translation:
                 continue
 
             translations_to_upsert.append(
                 DocumentTranslation(
                     document_content=content,
                     language=user_language,
-                    markdown=curr_translation["markdown"],
+                    markdown=matched_translation["markdown"],
                     updated_at=now,
                 )
             )

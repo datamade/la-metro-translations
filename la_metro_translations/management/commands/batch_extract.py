@@ -23,7 +23,7 @@ class Command(BaseCommand):
     help = (
         "Perform OCR text extraction on all Documents that either do not have a "
         "related DocumentContent object or have been updated more recently than their "
-        "DocumentContent, then create english DocumentTranslation and TranslationFiles."
+        "DocumentContent, then upsert english DocumentTranslation and TranslationFiles."
     )
 
     def handle(self, **options):
@@ -38,28 +38,29 @@ class Command(BaseCommand):
         else:
             logger.info(f"Performing OCR on {len(documents)} Document(s)...")
 
-        extractions = MistralOCRService.metered_batch_extract(documents)
+        extractions = list(MistralOCRService.metered_batch_extract(documents))
         now = datetime.now()
 
         # Update DocumentContents
         contents_to_upsert = []
         for doc in documents:
-            curr_extraction = next(
-                (
-                    extr
-                    for extr in extractions
-                    if extr["document_type"] == doc.document_type
+            matched_extraction = {}
+            for extr in extractions:
+                if (
+                    extr["document_type"] == doc.document_type
                     and extr["document_id"] == doc.document_id
-                ),
-                None,
-            )
+                ):
+                    matched_extraction = extr
+                    break
 
-            if not curr_extraction:
+            if not matched_extraction:
                 continue
 
             contents_to_upsert.append(
                 DocumentContent(
-                    document=doc, markdown=curr_extraction["markdown"], updated_at=now
+                    document=doc,
+                    markdown=matched_extraction["markdown"],
+                    updated_at=now,
                 )
             )
         new_contents = DocumentContent.objects.bulk_create(
