@@ -106,7 +106,7 @@ class Command(BaseCommand):
         )
 
         logger.info(
-            "Documents with new related content objects: "
+            "Documents with updated related content objects: "
             f"{len(new_contents)} out of {len(documents)}"
         )
         logger.info("--- Finished! ---")
