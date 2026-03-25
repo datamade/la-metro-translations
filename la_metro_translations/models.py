@@ -1,99 +1,59 @@
+import re
+
 from django.db import models
+from django.urls import reverse
 from django.utils.html import format_html
 
-from wagtail import blocks
-from wagtail.images.blocks import ImageChooserBlock
-from wagtail.models import Page
-from wagtail.fields import StreamField
-from wagtail.admin.panels import FieldPanel
-
-from la_metro_translations.blocks import ReactBlock
+from wagtail.images.blocks import ImageChooserBlock  # noqa
 
 
-class StaticPage(Page):
-    include_in_dump = True
-
-    body = StreamField(
-        [
-            ("content", blocks.RichTextBlock()),
-            ("image", ImageChooserBlock()),
-            ("react_block", ReactBlock()),
-        ],
-        blank=True,
-    )
-
-    content_panels = Page.content_panels + [
-        FieldPanel("body"),
-    ]
-
-    def get_template(self, request, *args, **kwargs):
-        if self.slug == "home":
-            return "la_metro_translations/home_page.html"
-        else:
-            return "la_metro_translations/static_page.html"
-
-
-class ExampleModel(models.Model):
-    include_in_dump = True
-
-    name = models.CharField(max_length=255)
-
-    def __str__(self):
-        return self.name
-
-
-class DetailPage(Page):
+def camel_to_snake(name):
     """
-    Need a detail page for your Django model instance/s? Try this!
-    Delete this model and its subclasses if you don't need detail pages.
-    User entered and editable data should live as attributes on a model's DetailPage;
-    immutable data should be attached to the corresponding model instance.
+    Inserts an underscore before all uppercase letters
+    that are not at the start of the string
     """
-
-    include_in_dump = True
-
-    class Meta:
-        abstract = True
-
-    body = StreamField(
-        [
-            ("content", blocks.RichTextBlock()),
-            ("image", ImageChooserBlock()),
-            ("react_block", ReactBlock()),
-        ],
-        blank=True,
-    )
-
-    def save(self, *args, **kwargs):
-        title = str(self.object)
-        for attr in ("title", "draft_title"):
-            setattr(self, attr, title)
-        super().save(*args, **kwargs)
+    s = re.sub("(?<!^)(?=[A-Z])", "_", name)
+    return s.lower()
 
 
-class ExampleModelDetailPage(DetailPage):
-    object = models.ForeignKey(
-        "ExampleModel",
-        blank=False,
-        null=True,
-        on_delete=models.SET_NULL,
-    )
-    content_panels = [
-        FieldPanel("object"),
-        FieldPanel("body"),
-    ]
+class AdminDisplayMixin:
+    def approval_status_display(self):
+        if getattr(self, "approval_status", False):
+            status_colors = {
+                "approved": "green",
+                "waiting": "orange",
+                "revision": "red",
+            }
+            color = status_colors.get(self.approval_status, "gray")
 
-    def get_context(self, request, *args, **kwargs):
-        """
-        By default, Wagtail will look for a template named a snake-case
-        version of the page model name, e.g., example_model_detail_page.html
-        """
-        context = super().get_context(request, *args, **kwargs)
-        # Add additional context for your template, if needed.
-        return context
+            return format_html(
+                '<span style="color: {}; font-weight: bold;">{}</span>',
+                color,
+                self.get_approval_status_display(),
+            )
+
+    def created_at_display(self):
+        if self.created_at:
+            return self.created_at.strftime("%Y-%m-%d %H:%M")  # noqa
+        return "-"
+
+    def updated_at_display(self):
+        if self.updated_at:
+            return self.updated_at.strftime("%Y-%m-%d %H:%M")  # noqa
+        return "-"
+
+    def edit_link_display(self):
+        edit_url = reverse(
+            f"{camel_to_snake(self._meta.object_name)}:edit", args=[self.pk]  # noqa
+        )
+        return format_html(
+            "<a href='{}' class='button button-small'>Manage {}</a>",
+            edit_url,
+            self._meta.verbose_name,
+        )
 
 
-class Document(models.Model):
+class Document(AdminDisplayMixin, models.Model):
     """
     Details on an original source document.
     """
@@ -134,22 +94,39 @@ class Document(models.Model):
     class Meta:
         ordering = ["entity_type", "title"]
 
-    def entity_display(self):
-        if self.entity_type:
-            return self.get_entity_type_display()
-        return "-"
+    def board_agendas_url_display(self):
+        if self.entity_type == "bill":
+            route = "board-report"
+        elif self.entity_type == "event":
+            route = "event"
+        # TODO: Update board agendas hook to post slug
+        entity_url = f"https://boardagendas.metro.net/{route}/{self.entity_id}/"  # noqa
+        return format_html(
+            """
+            <a href='{}' target='_blank' class='button button-small button-secondary'>
+                View related {}
+            </a>
+            """,
+            entity_url,
+            self.entity_type,
+        )
 
-    entity_display.short_description = "Entity"
+    board_agendas_url_display.short_description = "Board Agendas URL"
 
-    def updated_at_display(self):
-        if self.updated_at:
-            return self.updated_at.strftime("%Y-%m-%d %H:%M")
-        return "-"
+    def source_url_display(self):
+        return format_html(
+            """
+            <a href='{}' target='_blank' class='button button-small button-secondary'>
+                View original document
+            </a>
+            """,
+            self.source_url,
+        )
 
-    updated_at_display.short_description = "Last updated"
+    source_url_display.short_description = "Source URL"
 
 
-class DocumentContent(models.Model):
+class DocumentContent(AdminDisplayMixin, models.Model):
     """
     The extracted, untranslated content from a document, saved as markdown.
     """
@@ -185,38 +162,8 @@ class DocumentContent(models.Model):
 
     document_title.short_description = "Document Name"
 
-    def approval_status_display(self):
-        status_colors = {"approved": "green", "waiting": "orange", "revision": "red"}
-        color = status_colors.get(self.approval_status, "gray")
-        return format_html(
-            '<span style="color: {}; font-weight: bold;">{}</span>',
-            color,
-            self.get_approval_status_display(),
-        )
 
-    approval_status_display.short_description = "Approval Status"
-
-    def entity_display(self):
-        if self.document.entity_type:
-            return self.document.get_entity_type_display()
-        return "-"
-
-    entity_display.short_description = "Entity"
-
-    def document_updated_display(self):
-        if self.document.updated_at:
-            return self.document.updated_at.strftime("%Y-%m-%d %H:%M")
-        return "-"
-
-    document_updated_display.short_description = "Document Updated"
-
-    def content_updated_display(self):
-        return self.updated_at.strftime("%Y-%m-%d %H:%M")
-
-    content_updated_display.short_description = "Content Updated"
-
-
-class DocumentTranslation(models.Model):
+class DocumentTranslation(AdminDisplayMixin, models.Model):
     """
     The translated version of a document's extracted content.
     """
@@ -261,27 +208,6 @@ class DocumentTranslation(models.Model):
         return self.get_language_display()
 
     language_display.short_description = "Language"
-
-    def approval_status_display(self):
-        status_colors = {"approved": "green", "waiting": "orange", "revision": "red"}
-        color = status_colors.get(self.approval_status, "gray")
-        return format_html(
-            '<span style="color: {}; font-weight: bold;">{}</span>',
-            color,
-            self.get_approval_status_display(),
-        )
-
-    approval_status_display.short_description = "Approval Status"
-
-    def content_updated_display(self):
-        return self.document_content.updated_at.strftime("%Y-%m-%d %H:%M")
-
-    content_updated_display.short_description = "Content Updated"
-
-    def translation_updated_display(self):
-        return self.updated_at.strftime("%Y-%m-%d %H:%M")
-
-    translation_updated_display.short_description = "Translation Updated"
 
 
 class TranslationFile(models.Model):

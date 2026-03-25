@@ -6,6 +6,7 @@ from wagtail.admin.filters import WagtailFilterSet
 from django_filters import CharFilter, ChoiceFilter
 
 from .models import Document, DocumentContent, DocumentTranslation
+from .panels import PropertyPanel, RelatedObjectsPanel
 
 
 class DocumentFilterSet(WagtailFilterSet):
@@ -16,7 +17,7 @@ class DocumentFilterSet(WagtailFilterSet):
 
     class Meta:
         model = Document
-        fields = ["title", "entity_type"]
+        fields = ["title", "entity_type", "entity_id"]
 
 
 class DocumentContentFilterSet(WagtailFilterSet):
@@ -65,28 +66,6 @@ class DocumentTranslationFilterSet(WagtailFilterSet):
         ]
 
 
-class DocumentIndexView(IndexView):
-    template_name = "wagtailadmin/generic/document_index.html"
-
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        return queryset.select_related("content").order_by("entity_type", "title")
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        # Group documents by entity type
-        grouped_documents = {}
-        for doc in context["object_list"]:
-            entity_type = (
-                doc.get_entity_type_display() if doc.entity_type else "Unknown"
-            )
-            if entity_type not in grouped_documents:
-                grouped_documents[entity_type] = []
-            grouped_documents[entity_type].append(doc)
-        context["grouped_documents"] = grouped_documents
-        return context
-
-
 class DocumentViewSet(ModelViewSet):
     model = Document
     menu_label = "Documents"
@@ -94,12 +73,15 @@ class DocumentViewSet(ModelViewSet):
     menu_order = 200
     add_to_admin_menu = True
     filterset_class = DocumentFilterSet
-    index_view_class = DocumentIndexView
-    edit_template_name = "wagtailadmin/generic/document_edit.html"
 
-    list_display = ["title", "entity_display", "document_type", "updated_at_display"]
-    list_filter = ["entity_type", "document_type"]
-    search_fields = ["title"]
+    list_display = [
+        "title",
+        "updated_at_display",
+        "source_url_display",
+        "board_agendas_url_display",
+    ]
+    list_filter = ["entity_type"]
+    search_fields = ["title", "entity_id"]
 
     panels = [
         MultiFieldPanel(
@@ -107,8 +89,16 @@ class DocumentViewSet(ModelViewSet):
                 FieldPanel("title", read_only=True),
                 FieldRowPanel(
                     [
-                        FieldPanel("entity_type", read_only=True),
-                        FieldPanel("document_type", read_only=True),
+                        FieldPanel("created_at", read_only=True),
+                        FieldPanel("updated_at", read_only=True),
+                    ]
+                ),
+                FieldRowPanel(
+                    [
+                        PropertyPanel("source_url_display", heading="Source URL"),
+                        PropertyPanel(
+                            "board_agendas_url_display", heading="Board Agendas URL"
+                        ),
                     ]
                 ),
             ],
@@ -116,40 +106,54 @@ class DocumentViewSet(ModelViewSet):
         ),
         MultiFieldPanel(
             [
-                FieldPanel("source_url", read_only=True),
-                FieldRowPanel(
-                    [
-                        FieldPanel("created_at", read_only=True),
-                        FieldPanel("updated_at", read_only=True),
-                    ]
+                RelatedObjectsPanel(
+                    "la_metro_translations.DocumentContent",
+                    "document",
+                    panels=[
+                        FieldRowPanel(
+                            [
+                                PropertyPanel(
+                                    "updated_at_display", heading="Updated at"
+                                ),
+                                PropertyPanel(
+                                    "approval_status_display", heading="Approval status"
+                                ),
+                                PropertyPanel(
+                                    "edit_link_display", heading="Detail link"
+                                ),
+                            ]
+                        )
+                    ],
                 ),
             ],
-            heading="Source Information",
+            heading="Document Content",
         ),
         MultiFieldPanel(
             [
-                FieldPanel("document_id", read_only=True),
-                FieldPanel("entity_id", read_only=True),
+                RelatedObjectsPanel(
+                    "la_metro_translations.DocumentTranslation",
+                    "document_content__document",
+                    panels=[
+                        PropertyPanel("language_display"),
+                        FieldRowPanel(
+                            [
+                                PropertyPanel(
+                                    "updated_at_display", heading="Updated at"
+                                ),
+                                PropertyPanel(
+                                    "approval_status_display", heading="Approval status"
+                                ),
+                                PropertyPanel(
+                                    "edit_link_display", heading="Detail link"
+                                ),
+                            ]
+                        ),
+                    ],
+                ),
             ],
-            heading="External References",
+            heading="Document Translations",
         ),
     ]
-
-    def get_context_data(self, **kwargs):
-        print("firing documentviewset get_context_data")
-        context = super().get_context_data(**kwargs)
-        print(self, kwargs)
-        if hasattr(self, "object") and self.object:
-            # Add related content and translations for easy access
-            try:
-                context["document_content"] = self.object.content
-                context["document_translations"] = (
-                    self.object.content.translations.all()
-                )
-            except DocumentContent.DoesNotExist:
-                context["document_content"] = None
-                context["document_translations"] = []
-        return context
 
 
 class DocumentContentViewSet(ModelViewSet):
@@ -159,14 +163,11 @@ class DocumentContentViewSet(ModelViewSet):
     menu_order = 201
     add_to_admin_menu = True
     filterset_class = DocumentContentFilterSet
-    edit_template_name = "wagtailadmin/generic/document_content_edit.html"
 
     list_display = [
         "document_title",
         "approval_status_display",
-        "entity_display",
-        "document_updated_display",
-        "content_updated_display",
+        "updated_at_display",
     ]
     list_filter = ["approval_status", "document__entity_type"]
     search_fields = ["document__title", "markdown"]
@@ -174,12 +175,27 @@ class DocumentContentViewSet(ModelViewSet):
     panels = [
         MultiFieldPanel(
             [
-                FieldPanel("document", read_only=True),
-                FieldPanel("approval_status"),
+                RelatedObjectsPanel(
+                    "la_metro_translations.Document",
+                    "content",
+                    panels=[
+                        FieldRowPanel(
+                            [
+                                PropertyPanel(
+                                    "created_at_display", heading="Created at"
+                                ),
+                                PropertyPanel(
+                                    "updated_at_display", heading="Updated at"
+                                ),
+                                PropertyPanel("edit_link_display"),
+                                PropertyPanel("source_url_display"),
+                            ]
+                        )
+                    ],
+                ),
             ],
-            heading="Content Information",
+            heading="Document",
         ),
-        FieldPanel("markdown"),
         MultiFieldPanel(
             [
                 FieldRowPanel(
@@ -188,22 +204,43 @@ class DocumentContentViewSet(ModelViewSet):
                         FieldPanel("updated_at", read_only=True),
                     ]
                 ),
+                FieldPanel("approval_status"),
+                FieldPanel("markdown"),
             ],
-            heading="Timestamps",
+            heading="Document Content",
+        ),
+        MultiFieldPanel(
+            [
+                RelatedObjectsPanel(
+                    "la_metro_translations.DocumentTranslation",
+                    "document_content",
+                    panels=[
+                        PropertyPanel("language_display"),
+                        FieldRowPanel(
+                            [
+                                PropertyPanel(
+                                    "updated_at_display", heading="Updated at"
+                                ),
+                                PropertyPanel(
+                                    "approval_status_display", heading="Approval status"
+                                ),
+                                PropertyPanel(
+                                    "edit_link_display", heading="Detail link"
+                                ),
+                            ]
+                        ),
+                    ],
+                ),
+            ],
+            heading="Document Translations",
         ),
     ]
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        if hasattr(self, "object") and self.object:
-            context["source_url"] = self.object.document.source_url
-            context["translations"] = self.object.translations.all()
-        return context
 
 
 class DocumentTranslationIndexView(IndexView):
     def get_queryset(self):
-        return super().get_queryset().exclude(language="english")
+        return super().get_queryset()
+        # return super().get_queryset().exclude(language="english")
 
 
 class DocumentTranslationViewSet(ModelViewSet):
@@ -214,14 +251,12 @@ class DocumentTranslationViewSet(ModelViewSet):
     menu_order = 202
     add_to_admin_menu = True
     filterset_class = DocumentTranslationFilterSet
-    edit_template_name = "wagtailadmin/generic/document_translation_edit.html"
 
     list_display = [
         "document_title",
         "language_display",
         "approval_status_display",
-        "content_updated_display",
-        "translation_updated_display",
+        "updated_at_display",
     ]
     list_filter = [
         "language",
@@ -278,3 +313,12 @@ def register_document_content_viewset():
 @hooks.register("register_admin_viewset")
 def register_document_translation_viewset():
     return DocumentTranslationViewSet("document_translation")
+
+
+@hooks.register("construct_main_menu")
+def hide_all_but_modeladmin_and_settings(request, menu_items):
+    signatures = (
+        lambda x: "django.forms.widgets" in x.__module__,
+        lambda x: x.name == "settings",
+    )
+    menu_items[:] = [mi for mi in menu_items if any(sig(mi) for sig in signatures)]
