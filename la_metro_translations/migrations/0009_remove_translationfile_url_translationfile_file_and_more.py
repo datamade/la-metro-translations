@@ -7,27 +7,33 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('la_metro_translations', '0008_alter_document_document_type'),
+        ("la_metro_translations", "0008_alter_document_document_type"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='translationfile',
-            name='url',
+            model_name="translationfile",
+            name="url",
         ),
         migrations.AddField(
-            model_name='translationfile',
-            name='file',
-            field=models.FileField(blank=True, null=True, upload_to=la_metro_translations.models.translation_file_path),
+            model_name="translationfile",
+            name="file",
+            field=models.FileField(
+                blank=True,
+                null=True,
+                upload_to=la_metro_translations.models.translation_file_path,
+            ),
         ),
         migrations.AlterField(
-            model_name='documenttranslation',
-            name='language',
-            field=models.CharField(choices=[('en', 'English'), ('sp', 'Spanish')]),
+            model_name="documenttranslation",
+            name="language",
+            field=models.CharField(choices=[("en", "English"), ("sp", "Spanish")]),
         ),
         migrations.AlterField(
-            model_name='translationfile',
-            name='format',
-            field=models.CharField(choices=[('md', 'Markdown'), ('rtf', 'RTF'), ('pdf', 'PDF')]),
+            model_name="translationfile",
+            name="format",
+            field=models.CharField(
+                choices=[("md", "Markdown"), ("rtf", "RTF"), ("pdf", "PDF")]
+            ),
         ),
     ]

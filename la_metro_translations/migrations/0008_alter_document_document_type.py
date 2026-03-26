@@ -6,13 +6,19 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('la_metro_translations', '0007_document_unique_document_and_more'),
+        ("la_metro_translations", "0007_document_unique_document_and_more"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='document',
-            name='document_type',
-            field=models.CharField(choices=[('event_document', 'EventDocument'), ('bill_document', 'BillDocument'), ('bill_version', 'BillVersion')]),
+            model_name="document",
+            name="document_type",
+            field=models.CharField(
+                choices=[
+                    ("event_document", "EventDocument"),
+                    ("bill_document", "BillDocument"),
+                    ("bill_version", "BillVersion"),
+                ]
+            ),
         ),
     ]

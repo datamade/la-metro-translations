@@ -6,20 +6,29 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('la_metro_translations', '0006_alter_document_created_at_alter_document_document_id_and_more'),
+        (
+            "la_metro_translations",
+            "0006_alter_document_created_at_alter_document_document_id_and_more",
+        ),
     ]
 
     operations = [
         migrations.AddConstraint(
-            model_name='document',
-            constraint=models.UniqueConstraint(fields=('document_type', 'document_id'), name='unique_document'),
+            model_name="document",
+            constraint=models.UniqueConstraint(
+                fields=("document_type", "document_id"), name="unique_document"
+            ),
         ),
         migrations.AddConstraint(
-            model_name='documenttranslation',
-            constraint=models.UniqueConstraint(fields=('document_content', 'language'), name='unique_translation'),
+            model_name="documenttranslation",
+            constraint=models.UniqueConstraint(
+                fields=("document_content", "language"), name="unique_translation"
+            ),
         ),
         migrations.AddConstraint(
-            model_name='translationfile',
-            constraint=models.UniqueConstraint(fields=('document_translation', 'format'), name='unique_file'),
+            model_name="translationfile",
+            constraint=models.UniqueConstraint(
+                fields=("document_translation", "format"), name="unique_file"
+            ),
         ),
     ]
