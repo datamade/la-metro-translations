@@ -69,6 +69,7 @@ class Document(AdminDisplayMixin, models.Model):
     DOCUMENT_TYPE_CHOICES = [
         ("event_document", "EventDocument"),
         ("bill_document", "BillDocument"),
+        ("bill_version", "BillVersion"),
     ]
     ENTITY_TYPE_CHOICES = [
         ("event", "Event"),
@@ -98,8 +99,14 @@ class Document(AdminDisplayMixin, models.Model):
 
     def __str__(self):
         return self.title
-
+      
     class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["document_type", "document_id"],
+                name="unique_document",
+            )
+        ]
         ordering = ["entity_type", "title"]
 
     def board_agendas_url_display(self):
@@ -205,6 +212,12 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
         return f"{self.document_content.document.title} - {self.get_language_display()}"
 
     class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["document_content", "language"],
+                name="unique_translation",
+            )
+        ]
         ordering = ["-updated_at"]
 
     def document_title(self):
@@ -218,6 +231,8 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
         )
 
     language_display.short_description = "Language"
+    class Meta:
+        
 
 
 class TranslationFile(models.Model):
@@ -236,3 +251,11 @@ class TranslationFile(models.Model):
     document_translation = models.ForeignKey(
         DocumentTranslation, on_delete=models.CASCADE, related_name="files"
     )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["document_translation", "format"],
+                name="unique_file",
+            )
+        ]

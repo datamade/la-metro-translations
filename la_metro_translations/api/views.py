@@ -14,25 +14,32 @@ class DocumentUpdateView(APIView):
     def post(self, request):
         serializer = NotificationSerializer(data=request.data)
         if not serializer.is_valid():
+            if serializer.errors.get("api_key"):
+                return Response(serializer.errors, status=status.HTTP_403_FORBIDDEN)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         cleaned_data = serializer.data
 
         # Create/update documents
-        num_created = 0
-        num_updated = 0
+        documents_to_upsert = []
         for doc_details in cleaned_data["documents"]:
-            doc_obj, doc_created = Document.objects.update_or_create(
-                document_id=doc_details["document_id"], defaults=doc_details
-            )
-            num_created += 1 if doc_created else 0
-            num_updated += 1 if not doc_created else 0
+            documents_to_upsert.append(Document(**doc_details))
+
+        created_docs = Document.objects.bulk_create(
+            documents_to_upsert,
+            update_conflicts=True,
+            unique_fields=["document_type", "document_id"],
+            update_fields=[
+                "title",
+                "source_url",
+                "created_at",
+                "updated_at",
+                "entity_type",
+                "entity_id",
+            ],
+        )
 
         success_msg = {
-            "message": (
-                "Success: "
-                f"Document(s) created - {num_created}; "
-                f"Document(s) updated - {num_updated}"
-            )
+            "message": f"Success: Document(s) created/updated - {len(created_docs)}"
         }
         return Response(success_msg, status=status.HTTP_201_CREATED)
