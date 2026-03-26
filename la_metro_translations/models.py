@@ -97,6 +97,14 @@ class Document(models.Model):
     Details on an original source document.
     """
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["document_type", "document_id"],
+                name="unique_document",
+            )
+        ]
+
     DOCUMENT_TYPE_CHOICES = [
         ("event_document", "EventDocument"),
         ("bill_document", "BillDocument"),
@@ -128,13 +136,8 @@ class Document(models.Model):
         help_text="Primary key of this entity in the BoardAgendas app.",
     )
 
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["document_type", "document_id"],
-                name="unique_document",
-            )
-        ]
+    def __str__(self):
+        return f"{self.get_entity_type_display()} - {self.title}"
 
 
 class DocumentContent(models.Model):
@@ -162,15 +165,28 @@ class DocumentContent(models.Model):
         Document, on_delete=models.CASCADE, related_name="content"
     )
 
+    def __str__(self):
+        return (
+            f"Content for {self.document.title} ({self.get_approval_status_display()})"
+        )
+
 
 class DocumentTranslation(models.Model):
     """
     The translated version of a document's extracted content.
     """
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["document_content", "language"],
+                name="unique_translation",
+            )
+        ]
+
     LANGUAGE_CHOICES = [
-        ("english", "English"),
-        ("spanish", "Spanish"),
+        ("en", "English"),
+        ("sp", "Spanish"),
     ]
     APPROVAL_STATUS_CHOICES = [
         ("approved", "Approved for Publishing"),
@@ -193,31 +209,25 @@ class DocumentTranslation(models.Model):
         DocumentContent, on_delete=models.CASCADE, related_name="translations"
     )
 
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["document_content", "language"],
-                name="unique_translation",
-            )
-        ]
+    def __str__(self):
+        language = self.get_language_display()
+        title = self.document_content.document.title
+        return (
+            f"{language} translation for {title} ({self.get_approval_status_display()})"
+        )
+
+
+def translation_file_path(instance, filename):
+    year = instance.document_translation.document_content.document.created_at.year
+    doc_status = instance.document_translation.document_content.approval_status
+
+    return f"{doc_status}/{year}/{filename}"
 
 
 class TranslationFile(models.Model):
     """
     A version of a document's translation, uploaded to cloud storage.
     """
-
-    FORMAT_CHOICES = [
-        ("md", "md"),
-        ("rtf", "rtf"),
-        ("pdf", "pdf"),
-    ]
-
-    format = models.CharField(choices=FORMAT_CHOICES)
-    url = models.URLField(blank=True, null=True)
-    document_translation = models.ForeignKey(
-        DocumentTranslation, on_delete=models.CASCADE, related_name="files"
-    )
 
     class Meta:
         constraints = [
@@ -226,3 +236,24 @@ class TranslationFile(models.Model):
                 name="unique_file",
             )
         ]
+
+    FORMAT_CHOICES = [
+        ("md", "Markdown"),
+        ("rtf", "RTF"),
+        ("pdf", "PDF"),
+    ]
+
+    format = models.CharField(choices=FORMAT_CHOICES)
+    file = models.FileField(upload_to=translation_file_path, blank=True, null=True)
+    document_translation = models.ForeignKey(
+        DocumentTranslation, on_delete=models.CASCADE, related_name="files"
+    )
+
+    def __str__(self):
+        language = self.document_translation.get_language_display()
+        title = self.document_translation.document_content.document.title
+        return f"{language} translation file for {title} ({self.format})"
+
+    def delete(self):
+        self.file.delete(save=False)
+        super().delete()

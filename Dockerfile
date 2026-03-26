@@ -8,7 +8,7 @@ FROM python:3.14.2 AS app
 LABEL maintainer "DataMade <info@datamade.us>"
 
 RUN apt-get update && \
-	apt-get install -y --no-install-recommends --purge postgresql-client gdal-bin && \
+	apt-get install -y --no-install-recommends --purge postgresql-client gdal-bin pandoc && \
 	apt-get autoclean && \
 	rm -rf /var/lib/apt/lists/* && \
 	rm -rf /tmp/*
