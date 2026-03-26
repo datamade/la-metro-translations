@@ -99,7 +99,7 @@ class Document(AdminDisplayMixin, models.Model):
 
     def __str__(self):
         return self.title
-      
+
     class Meta:
         constraints = [
             models.UniqueConstraint(
@@ -231,8 +231,6 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
         )
 
     language_display.short_description = "Language"
-    class Meta:
-        
 
 
 class TranslationFile(models.Model):
