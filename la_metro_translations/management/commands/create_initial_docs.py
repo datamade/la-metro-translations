@@ -13,7 +13,7 @@ from la_metro_translations.models import (
 
 
 class Command(BaseCommand):
-    help = "Create test Document/DocumentContent/DocumentTranslation/TranslationFile objects in the DB."
+    help = "Create initial translation objects in the DB."
 
     def create_translation_file(
         self, doc_translation: DocumentTranslation
@@ -120,6 +120,7 @@ class Command(BaseCommand):
             tf = self.create_translation_file(trans)
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"Created TranslationFile (md) pk={tf.pk} for translation pk={trans.pk}"
+                    f"Created TranslationFile (md) pk={tf.pk} for translation"
+                    f" pk={trans.pk}"
                 )
             )
