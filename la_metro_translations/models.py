@@ -32,15 +32,21 @@ class AdminDisplayMixin:
                 self.get_approval_status_display(),
             )
 
+    approval_status_display.short_description = "Approval Status"
+
     def created_at_display(self):
         if self.created_at:
             return self.created_at.strftime("%Y-%m-%d %H:%M")  # noqa
         return "-"
 
+    created_at_display.short_description = "Created At"
+
     def updated_at_display(self):
         if self.updated_at:
             return self.updated_at.strftime("%Y-%m-%d %H:%M")  # noqa
         return "-"
+
+    updated_at_display.short_description = "Updated At"
 
     def edit_link_display(self):
         edit_url = reverse(
@@ -51,6 +57,8 @@ class AdminDisplayMixin:
             edit_url,
             self._meta.verbose_name,
         )
+
+    edit_link_display.short_description = "Edit Link"
 
 
 class Document(AdminDisplayMixin, models.Model):
@@ -160,7 +168,7 @@ class DocumentContent(AdminDisplayMixin, models.Model):
     def document_title(self):
         return self.document.title
 
-    document_title.short_description = "Document Name"
+    document_title.short_description = "Title"
 
 
 class DocumentTranslation(AdminDisplayMixin, models.Model):
@@ -205,7 +213,9 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
     document_title.short_description = "Document Name"
 
     def language_display(self):
-        return self.get_language_display()
+        return format_html(
+            "<h3 style='font-weight: bold;'>{}</h3>", self.get_language_display()
+        )
 
     language_display.short_description = "Language"
 

@@ -11,7 +11,6 @@ from la_metro_translations.api import views as api_views
 
 urlpatterns = [
     path("django-admin/", admin.site.urls),
-    path("admin/", include(wagtailadmin_urls)),
     path("documents/", include(wagtaildocs_urls)),
     path(
         "api/update-documents/",
@@ -19,16 +18,8 @@ urlpatterns = [
         name="update_documents",
     ),
     path("robots.txt/", views.robots_txt),
-]
-
-urlpatterns = urlpatterns + [
-    # For anything not caught by a more specific rule above, hand over to
-    # Wagtail's page serving mechanism. This should be the last pattern in
-    # the list:
-    path("", include(wagtail_urls)),
-    # Alternatively, if you want Wagtail pages to be served from a subpath
-    # of your site, rather than the site root:
-    #    path("pages/", include(wagtail_urls)),
+    path("pages/", include(wagtail_urls)),
+    path("", include(wagtailadmin_urls)),
 ]
 
 handler404 = "la_metro_translations.views.page_not_found"
