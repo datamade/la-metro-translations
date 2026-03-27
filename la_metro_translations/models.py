@@ -79,11 +79,13 @@ class Document(AdminDisplayMixin, models.Model):
     title = models.CharField()
     source_url = models.URLField(help_text="Link to the original pdf document.")
     created_at = models.DateTimeField(
+        auto_now_add=True,
         help_text=(
             "Date this original document was created, as per the BoardAgendas app."
         ),
     )
     updated_at = models.DateTimeField(
+        auto_now=True,
         help_text=(
             "Date this original document was updated, as per the BoardAgendas app."
         ),
@@ -114,6 +116,9 @@ class Document(AdminDisplayMixin, models.Model):
             route = "board-report"
         elif self.entity_type == "event":
             route = "event"
+        else:
+            return ""
+
         # TODO: Update board agendas hook to post slug
         entity_url = f"https://boardagendas.metro.net/{route}/{self.entity_id}/"  # noqa
         return format_html(
@@ -129,6 +134,9 @@ class Document(AdminDisplayMixin, models.Model):
     board_agendas_url_display.short_description = "Board Agendas URL"
 
     def source_url_display(self):
+        if not self.source_url:
+            return ""
+
         return format_html(
             """
             <a href='{}' target='_blank' class='button button-small button-secondary'>

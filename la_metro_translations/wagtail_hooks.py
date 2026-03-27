@@ -2,10 +2,28 @@ from wagtail import hooks
 from wagtail.admin.panels import FieldPanel, MultiFieldPanel, FieldRowPanel
 from wagtail.admin.viewsets.model import ModelViewSet
 from wagtail.admin.filters import WagtailFilterSet
+from wagtail.permissions import ModelPermissionPolicy
+
 from django_filters import CharFilter, ChoiceFilter
 
 from .models import Document, DocumentContent, DocumentTranslation
 from .panels import PropertyPanel, RelatedObjectsPanel
+
+
+class ReadEditOnlyPermissionPolicy(ModelPermissionPolicy):
+    """
+    Disable add and delete views.
+    """
+
+    def user_has_permission(self, user, action):
+        if action in ("add", "delete"):
+            return False
+        return super().user_has_permission(user, action)
+
+    def user_has_permission_for_instance(self, user, action, instance):
+        if action in ("add", "delete"):
+            return False
+        return super().user_has_permission_for_instance(user, action, instance)
 
 
 class DocumentFilterSet(WagtailFilterSet):
@@ -33,6 +51,10 @@ class DocumentViewSet(ModelViewSet):
         "source_url_display",
         "board_agendas_url_display",
     ]
+
+    @property
+    def permission_policy(self):
+        return ReadEditOnlyPermissionPolicy(self.model)
 
     panels = [
         MultiFieldPanel(
@@ -142,6 +164,10 @@ class DocumentContentViewSet(ModelViewSet):
         "updated_at_display",
     ]
 
+    @property
+    def permission_policy(self):
+        return ReadEditOnlyPermissionPolicy(self.model)
+
     panels = [
         MultiFieldPanel(
             [
@@ -247,6 +273,10 @@ class DocumentTranslationViewSet(ModelViewSet):
         "approval_status_display",
         "updated_at_display",
     ]
+
+    @property
+    def permission_policy(self):
+        return ReadEditOnlyPermissionPolicy(self.model)
 
     panels = [
         MultiFieldPanel(

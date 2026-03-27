@@ -46,6 +46,10 @@ class RelatedObjectsPanel(Panel):
 
     class BoundPanel(Panel.BoundPanel):
         def render_html(self, *args):
+            # Don't try to filter related objects for unsaved instances
+            if not self.instance.pk:
+                return mark_safe("")
+
             relations = apps.get_model(self.panel.related_cls).objects.filter(
                 **{self.panel.query_path: self.instance}
             )
