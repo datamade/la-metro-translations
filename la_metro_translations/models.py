@@ -221,7 +221,12 @@ def translation_file_path(instance, filename):
     year = instance.document_translation.document_content.document.created_at.year
     doc_status = instance.document_translation.document_content.approval_status
 
-    return f"{doc_status}/{year}/{filename}"
+    if doc_status == "approved":
+        top_dir = "Published"
+    else:
+        top_dir = "Unpublished"
+
+    return f"{top_dir}/{year}/{filename}"
 
 
 class TranslationFile(models.Model):
