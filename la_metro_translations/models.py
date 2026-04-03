@@ -1,98 +1,67 @@
+import re
+
 from django.db import models
+from django.urls import reverse
+from django.utils.html import format_html
 
-from wagtail import blocks
-from wagtail.images.blocks import ImageChooserBlock
-from wagtail.models import Page
-from wagtail.fields import StreamField
-from wagtail.admin.panels import FieldPanel
-
-from la_metro_translations.blocks import ReactBlock
+from wagtail.images.blocks import ImageChooserBlock  # noqa
 
 
-class StaticPage(Page):
-    include_in_dump = True
-
-    body = StreamField(
-        [
-            ("content", blocks.RichTextBlock()),
-            ("image", ImageChooserBlock()),
-            ("react_block", ReactBlock()),
-        ],
-        blank=True,
-    )
-
-    content_panels = Page.content_panels + [
-        FieldPanel("body"),
-    ]
-
-    def get_template(self, request, *args, **kwargs):
-        if self.slug == "home":
-            return "la_metro_translations/home_page.html"
-        else:
-            return "la_metro_translations/static_page.html"
-
-
-class ExampleModel(models.Model):
-    include_in_dump = True
-
-    name = models.CharField(max_length=255)
-
-    def __str__(self):
-        return self.name
-
-
-class DetailPage(Page):
+def camel_to_snake(name):
     """
-    Need a detail page for your Django model instance/s? Try this!
-    Delete this model and its subclasses if you don't need detail pages.
-    User entered and editable data should live as attributes on a model's DetailPage;
-    immutable data should be attached to the corresponding model instance.
+    Inserts an underscore before all uppercase letters
+    that are not at the start of the string
     """
-
-    include_in_dump = True
-
-    class Meta:
-        abstract = True
-
-    body = StreamField(
-        [
-            ("content", blocks.RichTextBlock()),
-            ("image", ImageChooserBlock()),
-            ("react_block", ReactBlock()),
-        ],
-        blank=True,
-    )
-
-    def save(self, *args, **kwargs):
-        title = str(self.object)
-        for attr in ("title", "draft_title"):
-            setattr(self, attr, title)
-        super().save(*args, **kwargs)
+    s = re.sub("(?<!^)(?=[A-Z])", "_", name)
+    return s.lower()
 
 
-class ExampleModelDetailPage(DetailPage):
-    object = models.ForeignKey(
-        "ExampleModel",
-        blank=False,
-        null=True,
-        on_delete=models.SET_NULL,
-    )
-    content_panels = [
-        FieldPanel("object"),
-        FieldPanel("body"),
-    ]
+class AdminDisplayMixin:
+    def approval_status_display(self):
+        if getattr(self, "approval_status", False):
+            status_colors = {
+                "approved": "green",
+                "waiting": "orange",
+                "revision": "red",
+            }
+            color = status_colors.get(self.approval_status, "gray")
 
-    def get_context(self, request, *args, **kwargs):
-        """
-        By default, Wagtail will look for a template named a snake-case
-        version of the page model name, e.g., example_model_detail_page.html
-        """
-        context = super().get_context(request, *args, **kwargs)
-        # Add additional context for your template, if needed.
-        return context
+            return format_html(
+                '<span style="color: {}; font-weight: bold;">{}</span>',
+                color,
+                self.get_approval_status_display(),
+            )
+
+    approval_status_display.short_description = "Approval Status"
+
+    def created_at_display(self):
+        if self.created_at:
+            return self.created_at.strftime("%Y-%m-%d %H:%M")  # noqa
+        return "-"
+
+    created_at_display.short_description = "Created At"
+
+    def updated_at_display(self):
+        if self.updated_at:
+            return self.updated_at.strftime("%Y-%m-%d %H:%M")  # noqa
+        return "-"
+
+    updated_at_display.short_description = "Updated At"
+
+    def edit_link_display(self):
+        edit_url = reverse(
+            f"{camel_to_snake(self._meta.object_name)}:edit", args=[self.pk]  # noqa
+        )
+        return format_html(
+            "<a href='{}' class='button button-small'>Manage {}</a>",
+            edit_url,
+            self._meta.verbose_name,
+        )
+
+    edit_link_display.short_description = "Edit Link"
 
 
-class Document(models.Model):
+class Document(AdminDisplayMixin, models.Model):
     """
     Details on an original source document.
     """
@@ -104,6 +73,7 @@ class Document(models.Model):
                 name="unique_document",
             )
         ]
+        ordering = ["entity_type", "title"]
 
     DOCUMENT_TYPE_CHOICES = [
         ("event_document", "EventDocument"),
@@ -118,11 +88,13 @@ class Document(models.Model):
     title = models.CharField()
     source_url = models.URLField(help_text="Link to the original pdf document.")
     created_at = models.DateTimeField(
+        auto_now_add=True,
         help_text=(
             "Date this original document was created, as per the BoardAgendas app."
         ),
     )
     updated_at = models.DateTimeField(
+        auto_now=True,
         help_text=(
             "Date this original document was updated, as per the BoardAgendas app."
         ),
@@ -139,11 +111,51 @@ class Document(models.Model):
     def __str__(self):
         return f"{self.get_entity_type_display()} - {self.title}"
 
+    def board_agendas_url_display(self):
+        if self.entity_type == "bill":
+            route = "board-report"
+        elif self.entity_type == "event":
+            route = "event"
+        else:
+            return ""
 
-class DocumentContent(models.Model):
+        # TODO: Update board agendas hook to post slug
+        entity_url = f"https://boardagendas.metro.net/{route}/{self.entity_id}/"  # noqa
+        return format_html(
+            """
+            <a href='{}' target='_blank' class='button button-small button-secondary'>
+                View related {}
+            </a>
+            """,
+            entity_url,
+            self.entity_type,
+        )
+
+    board_agendas_url_display.short_description = "Board Agendas URL"
+
+    def source_url_display(self):
+        if not self.source_url:
+            return ""
+
+        return format_html(
+            """
+            <a href='{}' target='_blank' class='button button-small button-secondary'>
+                View original document
+            </a>
+            """,
+            self.source_url,
+        )
+
+    source_url_display.short_description = "Source URL"
+
+
+class DocumentContent(AdminDisplayMixin, models.Model):
     """
     The extracted, untranslated content from a document, saved as markdown.
     """
+
+    class Meta:
+        ordering = ["-updated_at"]
 
     APPROVAL_STATUS_CHOICES = [
         ("approved", "Approved for Publishing"),
@@ -170,8 +182,13 @@ class DocumentContent(models.Model):
             f"Content for {self.document.title} ({self.get_approval_status_display()})"
         )
 
+    def document_title(self):
+        return self.document.title
 
-class DocumentTranslation(models.Model):
+    document_title.short_description = "Title"
+
+
+class DocumentTranslation(AdminDisplayMixin, models.Model):
     """
     The translated version of a document's extracted content.
     """
@@ -183,6 +200,7 @@ class DocumentTranslation(models.Model):
                 name="unique_translation",
             )
         ]
+        ordering = ["-updated_at"]
 
     LANGUAGE_CHOICES = [
         ("en", "English"),
@@ -215,6 +233,18 @@ class DocumentTranslation(models.Model):
         return (
             f"{language} translation for {title} ({self.get_approval_status_display()})"
         )
+
+    def document_title(self):
+        return self.document_content.document.title
+
+    document_title.short_description = "Document Name"
+
+    def language_display(self):
+        return format_html(
+            "<h3 style='font-weight: bold;'>{}</h3>", self.get_language_display()
+        )
+
+    language_display.short_description = "Language"
 
 
 def translation_file_path(instance, filename):

@@ -1,0 +1,14 @@
+{% extends "wagtailadmin/generic/edit.html" %}
+
+{% block main_header %}
+  {{ block.super }}
+  <div class="nice-padding" style="font-size: 125%;">
+    {% if object.approval_status == "approved" %}
+      <p><strong>The content of this document has been approved for translation.</strong> Making changes to document content will trigger <strong>{{ object.translations.count }}</strong> retranslation{{ object.translations.count|pluralize }}.</p>
+    {% elif object.approval_status == "waiting" %}
+      <p>The content of this document needs review before translation.</p>
+    {% elif object.approval_status == "revision" %}
+      <p>The content of this document needs revision before re-translation.</p>
+    {% endif %}
+  </div>
+{% endblock %}

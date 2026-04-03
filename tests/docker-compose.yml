@@ -6,4 +6,5 @@ services:
       DJANGO_SECRET_KEY: test-key
       # Disable manifest storage for testing
       DJANGO_STATICFILES_STORAGE: django.contrib.staticfiles.storage.StaticFilesStorage
+      DJANGO_SETTINGS_MODULE: la_metro_translations.settings
     command: pytest -sv
