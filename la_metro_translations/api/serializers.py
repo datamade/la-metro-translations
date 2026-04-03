@@ -21,6 +21,7 @@ class DocumentSerializer(serializers.ModelSerializer):
             "document_id",
             "entity_type",
             "entity_id",
+            "entity_slug",
         ]
 
     def get_validators(self):

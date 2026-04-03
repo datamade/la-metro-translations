@@ -3,6 +3,7 @@ import re
 from django.db import models
 from django.urls import reverse
 from django.utils.html import format_html
+from django.conf import settings
 
 from wagtail.images.blocks import ImageChooserBlock  # noqa
 
@@ -107,6 +108,9 @@ class Document(AdminDisplayMixin, models.Model):
     entity_id = models.CharField(
         help_text="Primary key of this entity in the BoardAgendas app.",
     )
+    entity_slug = models.CharField(
+        help_text="Slug to view this entity on the BoardAgendas app",
+    )
 
     def __str__(self):
         return f"{self.get_entity_type_display()} - {self.title}"
@@ -119,8 +123,7 @@ class Document(AdminDisplayMixin, models.Model):
         else:
             return ""
 
-        # TODO: Update board agendas hook to post slug
-        entity_url = f"https://boardagendas.metro.net/{route}/{self.entity_id}/"  # noqa
+        entity_url = f"{settings.BOARDAGENDAS_URL}/{route}/{self.entity_slug}/"  # noqa
         return format_html(
             """
             <a href='{}' target='_blank' class='button button-small button-secondary'>
