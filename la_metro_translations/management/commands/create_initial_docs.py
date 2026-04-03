@@ -74,25 +74,31 @@ class Command(BaseCommand):
             self.style.SUCCESS(f"Created Document {d2.document_id} (pk={d2.pk})")
         )
 
-        c1 = DocumentContent.objects.create(
-            document=d1,
-            markdown="# Doc1\n\nOriginal content",
-        )
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"Created DocumentContent (pk={c1.pk}) for Document {d1.document_id}"
+        with open(f"la_metro_translations/fixtures/{d1.title}.md") as f:
+            text = " ".join(f.readlines())
+            c1 = DocumentContent.objects.create(
+                document=d1,
+                markdown=text,
             )
-        )
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Created DocumentContent (pk={c1.pk}) for"
+                    f" Document {d1.document_id}"
+                )
+            )
 
-        c2 = DocumentContent.objects.create(
-            document=d2,
-            markdown="# Doc2\n\nOriginal content for doc2",
-        )
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"Created DocumentContent (pk={c2.pk}) for Document {d2.document_id}"
+        with open(f"la_metro_translations/fixtures/{d2.title}.md") as f:
+            text = " ".join(f.readlines())
+            c2 = DocumentContent.objects.create(
+                document=d2,
+                markdown=text,
             )
-        )
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Created DocumentContent (pk={c2.pk}) for"
+                    f" Document {d2.document_id}"
+                )
+            )
 
         # Create translation instances
         translations = []
