@@ -34,7 +34,7 @@ class DocumentTranslationFactory(factory.django.DjangoModelFactory):
         model = "la_metro_translations.DocumentTranslation"
 
     markdown = "Jugar querer montaña quince, otro gris más"
-    language = "spanish"
+    language = "sp"
     approval_status = "waiting"
 
 
