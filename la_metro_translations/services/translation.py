@@ -6,7 +6,7 @@ import sys
 
 from abc import ABC, abstractmethod
 from typing import Union, List, Generator
-from utils import BatchUtils
+from .utils import BatchUtils
 
 from django.conf import settings
 from django.db.models import QuerySet
@@ -47,7 +47,6 @@ class MistralTranslationService(TranslationService):
         translation time and cost.
         """
         start_time = time.time()
-        formatted_lang = dest_language.title()
         client = Mistral(api_key=settings.MISTRAL_API_KEY)
         document_id = content.document.document_id
         source_url = content.document.source_url
@@ -68,14 +67,14 @@ class MistralTranslationService(TranslationService):
                         "role": "user",
                         "content": (
                             "Translate the following text to "
-                            f"{formatted_lang}: {modded_text}"
+                            f"{dest_language}: {modded_text}"
                         ),
                     },
                 ],
             )
         except SDKError as e:
             logger.warning(
-                f"Error occurred when translating document to {formatted_lang}. "
+                f"Error occurred when translating document to {dest_language}. "
                 f"Document ID in BoardAgendas: {document_id} ; "
                 f"Document url: {source_url}"
             )
@@ -89,7 +88,7 @@ class MistralTranslationService(TranslationService):
             translated_text = data["choices"][0]["message"]["content"]
         except KeyError as e:
             logger.warning(
-                f"Error occurred when translating document to {formatted_lang}. "
+                f"Error occurred when translating document to {dest_language}. "
                 f"Document ID in BoardAgendas: {document_id} ; "
                 f"Document url: {source_url}"
             )
@@ -116,7 +115,6 @@ class MistralTranslationService(TranslationService):
         one language, and return the responses.
         """
         client = Mistral(api_key=settings.MISTRAL_API_KEY)
-        formatted_lang = language.title()
         all_content_images = {}
         timeout_hours = 23
 
@@ -144,7 +142,7 @@ class MistralTranslationService(TranslationService):
                                 "role": "user",
                                 "content": (
                                     "Translate the following text to "
-                                    f"{formatted_lang}: {modded_text}"
+                                    f"{language}: {modded_text}"
                                 ),
                             },
                         ],

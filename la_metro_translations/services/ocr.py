@@ -4,7 +4,7 @@ import logging
 import requests
 
 from typing import Union, List, Generator
-from utils import BatchUtils
+from .utils import BatchUtils
 
 from django.db.models import QuerySet
 from django.conf import settings
