@@ -38,16 +38,21 @@ class Command(BaseCommand):
 
     def handle(self, **options):
         supported_languages = [
-            choice[0]
+            choice
             for choice in DocumentTranslation.LANGUAGE_CHOICES
-            if choice[0] != "english"
+            if choice[0] != "en"
         ]
 
-        user_language = options["language"].lower()
-        if user_language not in supported_languages:
+        user_language = options["language"].title()
+        user_language_value = next(  # ie. "es"
+            (lang[0] for lang in supported_languages if lang[1] == user_language),
+            None,
+        )
+        if not user_language_value:
+            display_choices = [choice[1] for choice in supported_languages]
             raise ValueError(
                 f"This suite does not support translations to {user_language}. "
-                f"Currently supported languages are: {', '.join(supported_languages)}"
+                f"Currently supported languages are: {', '.join(display_choices)}"
             )
 
         # Get any document contents without translations in this language, or
@@ -56,7 +61,7 @@ class Command(BaseCommand):
             DocumentContent.objects.select_related("document")
             .exclude(
                 translations__updated_at__gte=F("updated_at"),
-                translations__language=user_language,
+                translations__language=user_language_value,
             )
             .distinct()
         )
@@ -91,7 +96,7 @@ class Command(BaseCommand):
             translations_to_upsert.append(
                 DocumentTranslation(
                     document_content=content,
-                    language=user_language,
+                    language=user_language_value,
                     markdown=matched_translation["markdown"],
                     updated_at=now,
                 )

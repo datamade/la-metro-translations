@@ -76,7 +76,7 @@ class Command(BaseCommand):
             english_translations_to_upsert.append(
                 DocumentTranslation(
                     document_content=content,
-                    language="english",
+                    language="en",
                     markdown=content.markdown,
                     updated_at=now,
                 )
@@ -94,15 +94,16 @@ class Command(BaseCommand):
             files_to_upsert.append(
                 TranslationFile(
                     document_translation=translation,
-                    url=translation.document_content.document.source_url,
+                    file=None,
                     format="pdf",
+                    updated_at=now,
                 )
             )
         TranslationFile.objects.bulk_create(
             files_to_upsert,
             update_conflicts=True,
             unique_fields=["document_translation", "format"],
-            update_fields=["url"],
+            update_fields=["updated_at"],
         )
 
         logger.info(
