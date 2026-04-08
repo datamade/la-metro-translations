@@ -66,10 +66,19 @@ class DocumentTranslationConverter:
         except Exception as e:
             raise DocumentTranslationConverterError(f"Conversion failed: {e}")
 
-        out_io = io.BytesIO(out_bytes)
         filename = self.doc_translation.document_content.document.title
         content_type = "application/rtf"
         language = self.doc_translation.language
+
+        # Add encoding strings to make sure file renders correctly
+        pre_bytes = (
+            r"{\rtf1\ansi\ansicpg1252\cocoartf2636\cocoatextscaling0"
+            r"\cocoaplatform0{\fonttbl\f0\fnil\fcharset0 Helvetica;}"
+        ).encode("utf-8")
+        post_bytes = r"}".encode("utf-8")
+        final_bytes = pre_bytes + out_bytes + post_bytes
+
+        out_io = io.BytesIO(final_bytes)
 
         django_file = InMemoryUploadedFile(
             file=out_io,
