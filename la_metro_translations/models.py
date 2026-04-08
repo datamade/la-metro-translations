@@ -265,6 +265,9 @@ def translation_file_path(instance, filename):
 class TranslationFile(models.Model):
     """
     A version of a document's translation, uploaded to cloud storage.
+
+    If this is a pdf version of an english translation, the file field will be empty.
+    Use get_file() to see the original Document's source_url for that file version.
     """
 
     class Meta:
@@ -286,6 +289,12 @@ class TranslationFile(models.Model):
     document_translation = models.ForeignKey(
         DocumentTranslation, on_delete=models.CASCADE, related_name="files"
     )
+    created_at = models.DateTimeField(
+        auto_now_add=True, help_text="Date this object was created in this app."
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True, help_text="Date this object was last updated in this app."
+    )
 
     def __str__(self):
         language = self.document_translation.get_language_display()
@@ -295,3 +304,9 @@ class TranslationFile(models.Model):
     def delete(self):
         self.file.delete(save=False)
         super().delete()
+
+    def get_file(self):
+        if format == "pdf" and self.document_translation.language == "en":
+            return self.document_translation.document_content.document.source_url
+
+        return self.file
