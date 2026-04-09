@@ -66,6 +66,15 @@ class Document(AdminDisplayMixin, models.Model):
     Details on an original source document.
     """
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["document_type", "document_id"],
+                name="unique_document",
+            )
+        ]
+        ordering = ["entity_type", "title"]
+
     DOCUMENT_TYPE_CHOICES = [
         ("event_document", "EventDocument"),
         ("bill_document", "BillDocument"),
@@ -100,16 +109,7 @@ class Document(AdminDisplayMixin, models.Model):
     )
 
     def __str__(self):
-        return self.title
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["document_type", "document_id"],
-                name="unique_document",
-            )
-        ]
-        ordering = ["entity_type", "title"]
+        return f"{self.get_entity_type_display()} - {self.title}"
 
     def board_agendas_url_display(self):
         if self.entity_type == "bill":
@@ -154,6 +154,9 @@ class DocumentContent(AdminDisplayMixin, models.Model):
     The extracted, untranslated content from a document, saved as markdown.
     """
 
+    class Meta:
+        ordering = ["-updated_at"]
+
     APPROVAL_STATUS_CHOICES = [
         ("approved", "Approved for Publishing"),
         ("waiting", "Waiting for Initial Review"),
@@ -175,10 +178,9 @@ class DocumentContent(AdminDisplayMixin, models.Model):
     )
 
     def __str__(self):
-        return f"{self.document.title} - Content"
-
-    class Meta:
-        ordering = ["-updated_at"]
+        return (
+            f"Content for {self.document.title} ({self.get_approval_status_display()})"
+        )
 
     def document_title(self):
         return self.document.title
@@ -191,9 +193,18 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
     The translated version of a document's extracted content.
     """
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["document_content", "language"],
+                name="unique_translation",
+            )
+        ]
+        ordering = ["-updated_at"]
+
     LANGUAGE_CHOICES = [
-        ("english", "English"),
-        ("spanish", "Spanish"),
+        ("en", "English"),
+        ("sp", "Spanish"),
     ]
     APPROVAL_STATUS_CHOICES = [
         ("approved", "Approved for Publishing"),
@@ -217,16 +228,11 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
     )
 
     def __str__(self):
-        return f"{self.document_content.document.title} - {self.get_language_display()}"
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["document_content", "language"],
-                name="unique_translation",
-            )
-        ]
-        ordering = ["-updated_at"]
+        language = self.get_language_display()
+        title = self.document_content.document.title
+        return (
+            f"{language} translation for {title} ({self.get_approval_status_display()})"
+        )
 
     def document_title(self):
         return self.document_content.document.title
@@ -241,22 +247,22 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
     language_display.short_description = "Language"
 
 
+def translation_file_path(instance, filename):
+    year = instance.document_translation.document_content.document.created_at.year
+    doc_status = instance.document_translation.document_content.approval_status
+
+    if doc_status == "approved":
+        top_dir = "Published"
+    else:
+        top_dir = "Unpublished"
+
+    return f"{top_dir}/{year}/{filename}"
+
+
 class TranslationFile(models.Model):
     """
     A version of a document's translation, uploaded to cloud storage.
     """
-
-    FORMAT_CHOICES = [
-        ("md", "md"),
-        ("rtf", "rtf"),
-        ("pdf", "pdf"),
-    ]
-
-    format = models.CharField(choices=FORMAT_CHOICES)
-    url = models.URLField(blank=True, null=True)
-    document_translation = models.ForeignKey(
-        DocumentTranslation, on_delete=models.CASCADE, related_name="files"
-    )
 
     class Meta:
         constraints = [
@@ -265,3 +271,24 @@ class TranslationFile(models.Model):
                 name="unique_file",
             )
         ]
+
+    FORMAT_CHOICES = [
+        ("md", "Markdown"),
+        ("rtf", "RTF"),
+        ("pdf", "PDF"),
+    ]
+
+    format = models.CharField(choices=FORMAT_CHOICES)
+    file = models.FileField(upload_to=translation_file_path, blank=True, null=True)
+    document_translation = models.ForeignKey(
+        DocumentTranslation, on_delete=models.CASCADE, related_name="files"
+    )
+
+    def __str__(self):
+        language = self.document_translation.get_language_display()
+        title = self.document_translation.document_content.document.title
+        return f"{language} translation file for {title} ({self.format})"
+
+    def delete(self):
+        self.file.delete(save=False)
+        super().delete()
