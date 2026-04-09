@@ -1,0 +1,100 @@
+---
+title: "A Developer's Guide to the Metro Galaxy"
+format:
+  html:
+    code-fold: true
+---
+
+Welcome to the documentation for the LA Metro Translation Suite!
+Here, you’ll find information about the translations pipeline, debugging, and other best practices for DataMade developers.
+
+## What does this do?
+At a high level, this suite takes a document from the BoardAgendas app, and uploads translations of that document in different file formats to cloud storage.
+
+Metro has access to the Wagtail interface in order to make editing and moderation decisions regarding which files ultimately show up on the BoardAgendas app.
+
+*Note: At time of writing, this suite is still in early stages of development. As such, documents are limited to agendas and board reports, and translations are being uploaded to AWS S3*
+
+## How is a document translated?
+We have a slew of management commands that handle making more accessible versions of an English document. For more information on any of the commands used, check out the [Commands Used section](commands.qmd).
+
+### Steps
+1. [Notify the Suite](#notify-the-suite)
+2. [Extract and Translate](#extract-and-translate)
+3. [Upload Files](#upload-files)
+4. [Expose the Link on BoardAgendas](#expose-the-link-on-boardagendas)
+
+### Notify the Suite
+<!-- TODO: adjust if the frequency timing changes -->
+Once an hour, the BoardAgendas app checks to see if there are any new documents that need to be translated. If any are found, that app sends a notification to a webhook on this suite with all the information we need on those documents. This search is limited to documents that we currently expect to translate. If we decide we'd like to translate more types of documents, be sure to make adjustments to both the notification sending process on the BoardAgendas app, and webhook in this suite.
+
+<details markdown='1'>
+  <summary>
+    <strong>Click here</strong> to show the format the webhook expects (can use this to perform your own tests).
+  </summary>
+  <pre><code>
+{
+  "api_key": "some_key",
+  "documents": [
+    {
+      "document_id": "123",
+      "title": "2025-0945 - COUNTYWIDE PLANNING MAJOR PROJECT STATUS REPORT",
+      "source_url": "https://metro.legistar.com/ViewReport.ashx?M=R&N=TextL5&GID=557&ID=11963&GUID=LATEST&Title=Board+Report",
+      "created_at": "2026-01-14",
+      "updated_at": "2026-01-14",
+      "document_type": "bill_version",
+      "entity_type": "bill",
+      "entity_id": "456",
+      "entity_slug": "tester"
+    },
+    {
+      "document_id": "789",
+      "title": "2026-0035 - METRO GOVERNANCE REVIEW MOTION",
+      "source_url": "https://metro.legistar.com/ViewReport.ashx?M=R&N=TextL5&GID=557&ID=12151&GUID=LATEST&Title=Board+Report",
+      "created_at": "2026-01-15",
+      "updated_at": "2026-01-15",
+      "document_type": "bill_version",
+      "entity_type": "bill",
+      "entity_id": "101",
+      "entity_slug": "tester"
+    },
+    {
+      "document_id": "321",
+      "title": "Planning and Programming Committee",
+      "source_url": "https://metro.legistar1.com/metro/meetings/2026/1/3218_A_Planning_and_Programming_Committee_26-01-14_Agenda.pdf",
+      "created_at": "2026-01-14",
+      "updated_at": "2026-01-14",
+      "document_type": "event_document",
+      "entity_type": "event",
+      "entity_id": "654",
+      "entity_slug": "tester"
+    },
+    {
+      "document_id": "111",
+      "title": "Regular Board Meeting",
+      "source_url": "https://metro.legistar1.com/metro/meetings/2025/9/3203_A_Board_of_Directors_-_Regular_Board_Meeting_25-09-25_Agenda.pdf",
+      "created_at": "2025-09-25",
+      "updated_at": "2025-09-25",
+      "document_type": "event_document",
+      "entity_type": "event",
+      "entity_id": "222",
+      "entity_slug": "tester"
+    }
+  ]
+}
+  </code></pre>
+</details>
+
+The api key between the two apps will have to match in order for the suite to accept the request. The webhook itself will then validate the input, create `Document` model objects for each recevied document, and response with a success message. This model is the base for all others and contains the original information sent from the BoardAgendas app.
+
+### Extract and Translate
+Once we've got our base `Document` objects, it's time to extract and translate the text therein. We've got two commands that run on regular intervals to keep things up to date. First up is extraction, taken care of by [`batch_extract`](commands.qmd#extract-text-from-documents). This command essentially checks for any Documents that need to be OCR'd, makes requests to Mistral's OCR model, downloads the result, and makes related objects - English `DocumentContent`, `DocumentTranslation`, `TranslationFile` objects.
+
+After that, [`batch_translate`](commands.qmd#translate-extracted-text) will come into play. It will look for any `DocumentContent` objects that need up to date translations and aggregate a list of the currently approved languages to translate into. Then it will make requests to Mistral's chat completion model using a system prompt with rules for translation, finally downloading the results in order to make `DocumentTranslation` objects for each language.
+
+### Upload Files
+The last steps are converting the documents into different file formats for accessibility, and putting them somewhere for the BoardAgendas site to pull from. The [`convert_docs`](commands.qmd#convert-markdown) command handles both of those cases. It will check for any `DocumentTranslation` objects that need up to date files, convert their markdown into pdf and rtf formats, and upload the results to cloud storage.
+
+### Expose the Link on BoardAgendas
+From here, it's the BoardAgendas job to display the links for all the alternate files available to each Event and Bill.
+<!-- TODO: write about this process in more detail once it's fleshed out-->

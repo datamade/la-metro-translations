@@ -1,7 +1,5 @@
 # La Metro Translation Suite
 
-_A shiny new Wagtail project!_
-
 ## Development
 
 ### Setup
@@ -79,3 +77,21 @@ To load a fixture into your local database, run:
 ```bash
 docker compose run --rm app python manage.py load_content
 ```
+
+## Updating the documentation
+
+To make changes to the documentation, [install Quarto](https://quarto.org/docs/get-started/).
+
+Then, run the following in your terminal:
+
+```bash
+quarto preview docs
+```
+
+Make your changes to the `.qmd` files in the `docs/` directory. They will be automatically
+reflected in your local version of the docs.
+
+For more on authoring docs with Quarto, see [their Getting Started guide](https://quarto.org/docs/get-started/authoring/text-editor.html) and [documentation](https://quarto.org/docs/guide/).
+
+The GitHub Pages site will rebuild automatically when your documentation changes are
+merged into `main`.
