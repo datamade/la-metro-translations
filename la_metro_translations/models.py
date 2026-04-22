@@ -3,6 +3,7 @@ import re
 from django.db import models
 from django.urls import reverse
 from django.utils.html import format_html
+from django.conf import settings
 
 from wagtail.images.blocks import ImageChooserBlock  # noqa
 
@@ -107,6 +108,9 @@ class Document(AdminDisplayMixin, models.Model):
     entity_id = models.CharField(
         help_text="Primary key of this entity in the BoardAgendas app.",
     )
+    entity_slug = models.CharField(
+        help_text="Slug to view this entity on the BoardAgendas app",
+    )
 
     def __str__(self):
         return f"{self.get_entity_type_display()} - {self.title}"
@@ -119,8 +123,7 @@ class Document(AdminDisplayMixin, models.Model):
         else:
             return ""
 
-        # TODO: Update board agendas hook to post slug
-        entity_url = f"https://boardagendas.metro.net/{route}/{self.entity_id}/"  # noqa
+        entity_url = f"{settings.BOARDAGENDAS_URL}/{route}/{self.entity_slug}/"  # noqa
         return format_html(
             """
             <a href='{}' target='_blank' class='button button-small button-secondary'>
@@ -262,6 +265,9 @@ def translation_file_path(instance, filename):
 class TranslationFile(models.Model):
     """
     A version of a document's translation, uploaded to cloud storage.
+
+    If this is a pdf version of an english translation, the file field will be empty.
+    Use get_file() to see the original Document's source_url for that file version.
     """
 
     class Meta:
@@ -283,6 +289,12 @@ class TranslationFile(models.Model):
     document_translation = models.ForeignKey(
         DocumentTranslation, on_delete=models.CASCADE, related_name="files"
     )
+    created_at = models.DateTimeField(
+        auto_now_add=True, help_text="Date this object was created in this app."
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True, help_text="Date this object was last updated in this app."
+    )
 
     def __str__(self):
         language = self.document_translation.get_language_display()
@@ -292,3 +304,9 @@ class TranslationFile(models.Model):
     def delete(self):
         self.file.delete(save=False)
         super().delete()
+
+    def get_file(self):
+        if self.format == "pdf" and self.document_translation.language == "en":
+            return self.document_translation.document_content.document.source_url
+
+        return self.file

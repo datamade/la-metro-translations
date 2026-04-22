@@ -17,7 +17,6 @@ repos:
     hooks:
       - id: flake8
         exclude: la_metro_translations/migrations
-        args: [--max-line-length=88, --extend-ignore=E203]
 
   - repo: https://github.com/rtts/djhtml
     rev: v1.5.1 # replace with the latest tag on GitHub

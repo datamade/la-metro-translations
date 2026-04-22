@@ -279,9 +279,11 @@ except KeyError:
     print("Please enter a Mistral api key in order to enable OCR and translation.")
 
 try:
+    BOARDAGENDAS_URL = os.environ["BOARDAGENDAS_URL"]
     BOARDAGENDAS_API_KEY = os.environ["BOARDAGENDAS_API_KEY"]
-except KeyError:
+except KeyError as e:
+    print(f"Missing env var: {e}")
     print(
-        "Please enter the BoardAgendas api key in order to "
-        "accept notifications of new documents from that app."
+        "Please enter all missing BoardAgendas config values in order to "
+        "accept notifications of new documents from, and link back to that app."
     )

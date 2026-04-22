@@ -55,6 +55,7 @@ class Command(BaseCommand):
             updated_at=timezone.now(),
             entity_type="bill",
             entity_id="test-entity-1",
+            entity_slug="test-entity-1-slug",
         )
         self.stdout.write(
             self.style.SUCCESS(f"Created Document {d1.document_id} (pk={d1.pk})")
@@ -69,6 +70,7 @@ class Command(BaseCommand):
             updated_at=timezone.now(),
             entity_type="event",
             entity_id="test-entity-2",
+            entity_slug="test-entity-2-slug",
         )
         self.stdout.write(
             self.style.SUCCESS(f"Created Document {d2.document_id} (pk={d2.pk})")

@@ -21,10 +21,11 @@ class DocumentSerializer(serializers.ModelSerializer):
             "document_id",
             "entity_type",
             "entity_id",
+            "entity_slug",
         ]
 
     def get_validators(self):
-        # Turn off the unqiue constraint validator here
+        # Turn off the unique constraint validator here
         # in order to let bulk_create's update_conflicts flag to work properly
         return [
             v
