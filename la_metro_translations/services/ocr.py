@@ -4,7 +4,7 @@ import logging
 import requests
 
 from typing import Union, List, Generator
-from .utils import BatchUtils
+from .utils import BatchUtils, MAX_BATCH_SIZE_BYTES
 
 from django.db.models import QuerySet
 from django.conf import settings
@@ -197,6 +197,8 @@ class MistralOCRService:
 
                         # Push new link tags into the temporary hyperlinked block
                         for attmt_label in attmt_labels:
+                            if not attmt_links:
+                                break
                             full_attmt_tag = f"[{attmt_label}]({attmt_links[0]})"
                             hyperlinked_block = hyperlinked_block.replace(
                                 attmt_label, full_attmt_tag
@@ -211,6 +213,8 @@ class MistralOCRService:
 
                     # Process board report labels
                     for bill_label in bill_labels:
+                        if not bill_links:
+                            break
                         full_bill_tag = f"[{bill_label}]({bill_links[0]})"
                         markdown = markdown.replace(bill_label, full_bill_tag, 1)
                         del bill_links[0]
@@ -239,15 +243,23 @@ class MistralOCRService:
         The batches are split up when the total file size of the contents in the urls
         reaches a set maximum.
         """
-        max_batch_size = 30000000  # 30MB
+        max_batch_size = MAX_BATCH_SIZE_BYTES
         curr_batch_size = 0
         curr_batch = []
         batch_num = 1
 
+        documents = list(documents)
         for i, doc in enumerate(documents):
             # Check file size
-            res = requests.head(doc.source_url)
-            curr_batch_size += int(res.headers["Content-Length"])
+            try:
+                res = requests.head(doc.source_url, timeout=10)
+                res.raise_for_status()
+                curr_batch_size += int(res.headers.get("Content-Length", 0))
+            except Exception as e:
+                logger.warning(
+                    f"Could not determine file size for {doc.source_url}: {e}. "
+                    "Including in current batch."
+                )
             curr_batch.append(doc)
 
             # Send batch if we've exceeded max file size or at the end of the list

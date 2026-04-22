@@ -36,6 +36,7 @@ class DocumentUpdateView(APIView):
                 "updated_at",
                 "entity_type",
                 "entity_id",
+                "entity_slug",
             ],
         )
 

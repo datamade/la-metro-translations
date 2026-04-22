@@ -306,7 +306,7 @@ class TranslationFile(models.Model):
         super().delete()
 
     def get_file(self):
-        if format == "pdf" and self.document_translation.language == "en":
+        if self.format == "pdf" and self.document_translation.language == "en":
             return self.document_translation.document_content.document.source_url
 
         return self.file

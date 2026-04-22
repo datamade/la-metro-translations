@@ -12,6 +12,8 @@ from mistralai.models.batchjobout import BatchJobOut
 
 logger = logging.getLogger(__name__)
 
+MAX_BATCH_SIZE_BYTES = 30_000_000  # 30MB Mistral batch API limit
+
 
 class BatchUtils:
     @staticmethod
@@ -62,6 +64,7 @@ class BatchUtils:
         file. The interval for checking is defined in seconds.
         """
         start_time = time.time()
+        minutes_elapsed = 0
         retrieved_job = client.batch.jobs.get(job_id=job_id)
 
         logger.info(

@@ -6,7 +6,7 @@ import sys
 
 from abc import ABC, abstractmethod
 from typing import Union, List, Generator
-from .utils import BatchUtils
+from .utils import BatchUtils, MAX_BATCH_SIZE_BYTES
 
 from django.conf import settings
 from django.db.models import QuerySet
@@ -172,8 +172,16 @@ class MistralTranslationService(TranslationService):
 
             document_type = translation_response["custom_id"].split(":")[0]
             document_id = translation_response["custom_id"].split(":")[1]
-            response_body = translation_response["response"]["body"]
-            translated_text = response_body["choices"][0]["message"]["content"]
+
+            try:
+                response_body = translation_response["response"]["body"]
+                translated_text = response_body["choices"][0]["message"]["content"]
+            except (KeyError, IndexError) as e:
+                logger.warning(
+                    f"Error parsing batch translation response for "
+                    f"{document_type}:{document_id}: {e}. Skipping..."
+                )
+                continue
 
             # Match this translation with its images using a key with
             # the same format as the doc_custom_id set up earlier
@@ -245,12 +253,13 @@ class MistralTranslationService(TranslationService):
         and return the responses. The batches are split up when
         the total size of the strings involved for all requests reaches a set maximum.
         """
-        max_batch_size = 30000000  # 30MB
+        max_batch_size = MAX_BATCH_SIZE_BYTES
         sys_msg_size = sys.getsizeof(SYSTEM_MESSAGE)
         curr_batch_size = 0
         curr_batch = []
         batch_num = 1
 
+        contents = list(contents)
         for i, content in enumerate(contents):
             # Check size of upcoming request
             curr_batch_size += sys.getsizeof(content.markdown) + sys_msg_size
