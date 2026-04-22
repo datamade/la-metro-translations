@@ -1,0 +1,42 @@
+---
+title: "Models"
+order: 2
+---
+
+This suite has a few hierarchical models that connect to each other.
+
+## Document
+Contains details of the original Document from Legistar/BoardAgendas.
+
+**Children**
+
+- `DocumentContent` - **one** content to **one** document
+
+## DocumentContent
+Details on the extracted content generated from the original `Document` object's file.
+
+**Parent**
+
+- `Document`
+
+**Children**
+
+- `DocumentTranslation` - **one** content to **many** translations
+
+## DocumentTranslation
+Details on the translated content. Each content object can only have one translation in each language.
+
+**Parent**
+
+- `DocumentContent`
+
+**Children**
+
+- `TranslationFile` - **one** translation to **many** files
+
+## TranslationFile
+The file available to download from cloud storage for each translation. Each translation can only have one file in each of the supported file types - PDF or RTF.
+
+**Parent**
+
+- `DocumentTranslation`

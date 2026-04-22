@@ -1,0 +1,44 @@
+---
+title: "Commands Used"
+order: 1
+---
+
+The LA Metro galaxy comes with several CLI commands and their various options.
+This section identifies some of the most significant management commands for the suite, how to use them and where to execute them.
+
+*Note*: The term "up to date" is used throughout this section to mean objects that have an `updated_at` value that is equal to or more recent than its parent object's `updated_at` value.
+
+## Extract Text from Documents
+We run batched OCR jobs in order to turn the text in a document into markdown for us to manipulate. This is taken care of by the `batch_extract` command.
+
+```bash
+python manage.py batch_extract
+```
+
+This command looks for any `Document` objects that either do not have a related up to date `DocumentContent` object, or have been updated more recently than their `DocumentContent`. It preps as many batches of multiple documents as needed, judging by the size of each original PDF that will be translated. Mistral has a 50MB limit on requests, so we start a new batch once the total size of all PDFs in the current one reaches 30MB. It checks once every minute, and upon success it downloads the resulting markdown, using it to upsert English `DocumentTranslation` and `TranslationFiles`.
+
+Part of the extraction process involves reinserting images, tables, and links back into the original text after extraction. Luckily Mistral separates all three of those into fields for us to find, and replaces images and tables with placeholders that we use to easily pop those back into place. Links however, are just listed in the order they were found in each page. So we're reinserting them a couple different ways depending on the document type.
+
+For agendas, the fact that Metro creates those using a template means there is a solid pattern for reinserting links for related attachments and bills. Attachments appear as blocks of lists, and bills show up as 8 digits bisected by a hyphen. Any link that doesn't get matched for whatever reason gets appended to the end of the page. For board reports, we're simply appending all links to the end of each page, since there isn't yet a discernable pattern to the way those show up.
+
+## Translate Extracted Text
+After documents have had their text extracted, we then translate that text using `batch_translate`.
+
+```bash
+python manage.py batch_translate <language>
+```
+
+This command takes a language as an argument and checks whether that chosen language is one of those we currently support. If it is, it'll start gathering any `DocumentContent` objects that need up to date `DocumentTranslations` in the language.
+
+Next, it'll send them to Mistral's chat completion model with two prompts. One is a system prompt with rules for translation (prompt found at `la_metro_translations/prompt.txt`), and the other is a user prompt that just asks the model to translate the following text into the language, followed by the full document's text.
+
+Requests to the chat model will be batched similarly to the extractions throughout this process, except each request's size here is determined by the combined size of the system prompt and user prompt, including the text of the document. In order to cut down on size and not risk translating things that we shouldn't, we cache the images found in each document, replace them with placeholders, and reinsert them later.
+
+## Convert Markdown
+Once we've got our translations, they can be uploaded to cloud storage as different file types with our `convert_docs` command.
+
+```bash
+python manage.py convert_docs
+```
+
+This command will look for any `DocumentTranslation` objects in all languages that need up to date PDFs and RTFs, make them, and upload them to cloud storage. The only exception is it won't create an English PDF, since the original `Document` object will already have a link to that original file and we don't need to make it twice.
