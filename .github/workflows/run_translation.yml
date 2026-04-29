@@ -1,0 +1,43 @@
+name: Run translation ETL
+
+on:
+  pull_request:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+env:
+  DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_STORAGE_BUCKET_NAME: ${{ secrets.AWS_STORAGE_BUCKET_NAME }}
+  MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+  BOARDAGENDAS_API_KEY: ${{ secrets.BOARDAGENDAS_API_KEY }}
+  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+  DJANGO_DEBUG: $${ vars.DJANGO_DEBUG }}
+  BOARDAGENDAS_URL: $${ vars.BOARDAGENDAS_URL }}
+
+jobs:
+  etl:
+    runs-on: ubuntu-latest
+    # environment: ${{ startsWith(github.ref, 'refs/heads/main') && 'staging' || startsWith(github.ref, 'refs/heads/deploy/') && 'production' }}
+    environment: staging
+    container:
+      image: ghcr.io/datamade/la-metro-translations:main
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.github_token }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run batch extract
+        run: python manage.py batch_extract
+
+      - name: Run batch translation
+        run: python manage.py batch_translate spanish
+
+      - name: Convert docs
+        run: python manage.py convert_docs
