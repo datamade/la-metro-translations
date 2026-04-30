@@ -1,0 +1,71 @@
+name: Run translation ETL
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Deployment environment"
+        required: true
+        type: choice
+        default: staging
+        options:
+          - staging
+          - production
+
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+
+env:
+  DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_STORAGE_BUCKET_NAME: ${{ secrets.AWS_STORAGE_BUCKET_NAME }}
+  MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+  BOARDAGENDAS_API_KEY: ${{ secrets.BOARDAGENDAS_API_KEY }}
+  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+  DJANGO_DEBUG: $${ vars.DJANGO_DEBUG }}
+  BOARDAGENDAS_URL: $${ vars.BOARDAGENDAS_URL }}
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    container:
+      image: ghcr.io/datamade/la-metro-translations:${{ github.event.inputs.environment == 'production' && 'deploy' || 'main' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Run batch extract
+        run: python manage.py batch_extract
+
+  translate:
+    needs: extract
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    strategy:
+      matrix:
+        language: [spanish]
+    container:
+      image: ghcr.io/datamade/la-metro-translations:${{ github.event.inputs.environment == 'production' && 'deploy' || 'main' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Run batch translation
+        run: python manage.py batch_translate ${{ matrix.language }}
+
+  convert:
+    needs: translate
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    container:
+      image: ghcr.io/datamade/la-metro-translations:${{ github.event.inputs.environment == 'production' && 'deploy' || 'main' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Convert docs
+        run: python manage.py convert_docs
