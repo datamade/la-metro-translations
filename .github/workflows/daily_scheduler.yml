@@ -1,4 +1,4 @@
-name: Daily dispatcher
+name: Daily translation dispatcher
 
 on:
   pull_request:
@@ -7,11 +7,12 @@ on:
     - cron: "0 0 * * *" # Runs every day at midnight UTC
 
 jobs:
-  run-etl:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        branch: [staging]
+  staging:
     uses: ./.github/workflows/run_translation.yml
     with:
-      environment: ${{ matrix.branch }}
+      environment: staging
+
+  production:
+    uses: ./.github/workflows/run_translation.yml
+    with:
+      environment: production
