@@ -1,7 +1,6 @@
 name: Run translation ETL
 
 on:
-  pull_request:
   workflow_dispatch:
     inputs:
       environment:
@@ -27,7 +26,7 @@ env:
 jobs:
   extract:
     runs-on: ubuntu-latest
-    environment: staging
+    environment: ${{ github.event.inputs.environment }}
     container:
       image: ghcr.io/datamade/la-metro-translations:${{ github.event.inputs.environment == 'production' && 'deploy' || 'main' }}
     steps:
@@ -40,7 +39,7 @@ jobs:
   translate:
     needs: extract
     runs-on: ubuntu-latest
-    environment: staging
+    environment: ${{ github.event.inputs.environment }}
     strategy:
       matrix:
         language: [spanish]
@@ -56,7 +55,7 @@ jobs:
   convert:
     needs: translate
     runs-on: ubuntu-latest
-    environment: staging
+    environment: ${{ github.event.inputs.environment }}
     container:
       image: ghcr.io/datamade/la-metro-translations:${{ github.event.inputs.environment == 'production' && 'deploy' || 'main' }}
     steps:
