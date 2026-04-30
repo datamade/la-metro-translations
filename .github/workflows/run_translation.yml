@@ -31,12 +31,18 @@ env:
 jobs:
   extract:
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
+    environment:
+      name: ${{ inputs.environment }}
     container:
       image: ghcr.io/datamade/la-metro-translations:${{ inputs.environment == 'production' && 'deploy' || 'main' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+
+      - name: Check environment
+        run: |
+          echo "ENVIRONMENT:"
+          echo "${{ inputs.environment || workflow_call.inputs.environment }}"
 
       - name: Run batch extract
         run: python manage.py batch_extract
@@ -44,7 +50,8 @@ jobs:
   translate:
     needs: extract
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
+    environment:
+      name: ${{ inputs.environment }}
     strategy:
       matrix:
         language: [spanish]
@@ -60,7 +67,8 @@ jobs:
   convert:
     needs: translate
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
+    environment:
+      name: ${{ inputs.environment }}
     container:
       image: ghcr.io/datamade/la-metro-translations:${{ inputs.environment == 'production' && 'deploy' || 'main' }}
     steps:
