@@ -1,11 +1,16 @@
 name: Run translation ETL
 
 on:
-  pull_request:
-    branches:
-      - main
-
   workflow_dispatch:
+    inputs:
+      environment:
+        description: "Deployment environment"
+        required: true
+        type: choice
+        default: staging
+        options:
+          - staging
+          - production
 
 env:
   DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
@@ -19,16 +24,11 @@ env:
   BOARDAGENDAS_URL: $${ vars.BOARDAGENDAS_URL }}
 
 jobs:
-  etl:
+  extract:
     runs-on: ubuntu-latest
-    # environment: ${{ startsWith(github.ref, 'refs/heads/main') && 'staging' || startsWith(github.ref, 'refs/heads/deploy/') && 'production' }}
-    environment: staging
+    environment: ${{ github.event.inputs.environment }}
     container:
       image: ghcr.io/datamade/la-metro-translations:main
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.github_token }}
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -36,8 +36,31 @@ jobs:
       - name: Run batch extract
         run: python manage.py batch_extract
 
+  translate:
+    needs: extract
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    strategy:
+      matrix:
+        language: [spanish]
+    container:
+      image: ghcr.io/datamade/la-metro-translations:main
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Run batch translation
-        run: python manage.py batch_translate spanish
+        run: python manage.py batch_translate ${{ matrix.language }}
+
+  convert:
+    needs: translate
+    runs-on: ubuntu-latest
+    environment: staging
+    container:
+      image: ${{ github.event.inputs.environment }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Convert docs
         run: python manage.py convert_docs
