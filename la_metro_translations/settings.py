@@ -101,6 +101,7 @@ INSTALLED_APPS = [
     "webpack_loader",
     "la_metro_translations",
     "storages",
+    "wagtailmarkdown",
 ]
 
 MIDDLEWARE = [

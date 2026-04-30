@@ -7,6 +7,8 @@ from django.conf import settings
 
 from wagtail.images.blocks import ImageChooserBlock  # noqa
 
+from wagtailmarkdown.fields import MarkdownField
+
 
 def camel_to_snake(name):
     """
@@ -166,7 +168,7 @@ class DocumentContent(AdminDisplayMixin, models.Model):
         ("revision", "Needs Revision"),
     ]
 
-    markdown = models.TextField()
+    markdown = MarkdownField()
     approval_status = models.CharField(
         choices=APPROVAL_STATUS_CHOICES, default="waiting"
     )
@@ -215,7 +217,7 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
         ("revision", "Needs Revision"),
     ]
 
-    markdown = models.TextField()
+    markdown = MarkdownField()
     language = models.CharField(choices=LANGUAGE_CHOICES)
     approval_status = models.CharField(
         choices=APPROVAL_STATUS_CHOICES, default="waiting"
