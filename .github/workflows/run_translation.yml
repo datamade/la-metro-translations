@@ -12,6 +12,11 @@ on:
           - staging
           - production
 
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+
 env:
   DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}

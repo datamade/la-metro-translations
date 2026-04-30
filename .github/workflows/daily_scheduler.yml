@@ -1,0 +1,17 @@
+name: Daily dispatcher
+
+on:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * *" # Runs every day at midnight UTC
+
+jobs:
+  run-etl:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        branch: [staging]
+    uses: ./.github/workflows/run_translation.yml
+    with:
+      environment: ${{ matrix.branch }}
