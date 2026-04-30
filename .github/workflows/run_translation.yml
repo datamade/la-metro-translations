@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment }}
     container:
-      image: ghcr.io/datamade/la-metro-translations:main
+      image: ghcr.io/datamade/la-metro-translations:${{ github.event.inputs.environment == 'production' && 'deploy' || 'main' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -44,7 +44,7 @@ jobs:
       matrix:
         language: [spanish]
     container:
-      image: ghcr.io/datamade/la-metro-translations:main
+      image: ghcr.io/datamade/la-metro-translations:${{ github.event.inputs.environment == 'production' && 'deploy' || 'main' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -57,7 +57,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     container:
-      image: ${{ github.event.inputs.environment }}
+      image: ghcr.io/datamade/la-metro-translations:${{ github.event.inputs.environment == 'production' && 'deploy' || 'main' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
