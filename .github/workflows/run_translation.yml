@@ -39,11 +39,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Check environment
-        run: |
-          echo "ENVIRONMENT:"
-          echo "${{ inputs.environment || workflow_call.inputs.environment }}"
-
       - name: Run batch extract
         run: python manage.py batch_extract
 
