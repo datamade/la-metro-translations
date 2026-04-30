@@ -29,7 +29,7 @@ env:
   BOARDAGENDAS_URL: $${ vars.BOARDAGENDAS_URL }}
   # Get correct deployment environment whether this workflow was called
   # manually for from another workflow
-  DEPLOY_ENV: ${{ coalesce(fromJson(toJson(github.event.workflow_call.inputs)).environment, github.event.inputs.environment) }}
+  DEPLOY_ENV: ${{ github.event.inputs.environment || github.event.workflow_call.inputs.environment }}
 
 jobs:
   extract:
