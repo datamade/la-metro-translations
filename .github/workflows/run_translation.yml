@@ -31,7 +31,7 @@ jobs:
       image: ghcr.io/datamade/la-metro-translations:${{ github.event.inputs.environment == 'production' && 'deploy' || 'main' }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Run batch extract
         run: python manage.py batch_extract
@@ -47,7 +47,7 @@ jobs:
       image: ghcr.io/datamade/la-metro-translations:${{ github.event.inputs.environment == 'production' && 'deploy' || 'main' }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Run batch translation
         run: python manage.py batch_translate ${{ matrix.language }}
@@ -60,7 +60,7 @@ jobs:
       image: ghcr.io/datamade/la-metro-translations:${{ github.event.inputs.environment == 'production' && 'deploy' || 'main' }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Convert docs
         run: python manage.py convert_docs
