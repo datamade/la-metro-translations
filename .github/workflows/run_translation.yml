@@ -1,21 +1,11 @@
 name: Run translation ETL
 
 on:
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: "Deployment environment"
-        required: true
-        type: choice
-        default: staging
-        options:
-          - staging
-          - production
-
   workflow_call:
     inputs:
       environment:
         type: string
+        required: true
 
 env:
   DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
@@ -31,7 +21,8 @@ env:
 jobs:
   extract:
     runs-on: ubuntu-latest
-    environment: staging
+    environment:
+      name: ${{ inputs.environment }}
     container:
       image: ghcr.io/datamade/la-metro-translations:${{ inputs.environment == 'production' && 'deploy' || 'main' }}
     steps:

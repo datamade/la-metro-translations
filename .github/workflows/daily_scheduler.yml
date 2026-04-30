@@ -12,7 +12,7 @@ jobs:
     with:
       environment: staging
 
-  production:
-    uses: ./.github/workflows/run_translation.yml
-    with:
-      environment: production
+  # production:
+  #   uses: ./.github/workflows/run_translation.yml
+  #   with:
+  #     environment: production
