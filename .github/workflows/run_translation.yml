@@ -27,7 +27,7 @@ env:
 jobs:
   extract:
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment }}
+    environment: staging
     container:
       image: ghcr.io/datamade/la-metro-translations:${{ github.event.inputs.environment == 'production' && 'deploy' || 'main' }}
     steps:
@@ -40,7 +40,7 @@ jobs:
   translate:
     needs: extract
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment }}
+    environment: staging
     strategy:
       matrix:
         language: [spanish]
