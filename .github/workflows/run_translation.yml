@@ -31,8 +31,7 @@ env:
 jobs:
   extract:
     runs-on: ubuntu-latest
-    environment:
-      name: ${{ inputs.environment }}
+    environment: staging
     container:
       image: ghcr.io/datamade/la-metro-translations:${{ inputs.environment == 'production' && 'deploy' || 'main' }}
     steps:
