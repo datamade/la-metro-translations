@@ -17,3 +17,4 @@ jobs:
   #   uses: ./.github/workflows/run_translation.yml
   #   with:
   #     environment: production
+  #   secrets: inherit
