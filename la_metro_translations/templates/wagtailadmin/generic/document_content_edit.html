@@ -3,8 +3,9 @@
 {% block main_header %}
   {{ block.super }}
   <div class="nice-padding" style="font-size: 125%;">
+
     {% if object.approval_status == "approved" %}
-      <p><strong>The content of this document has been approved for translation.</strong> Making changes to document content will trigger <strong>{{ object.translations.count }}</strong> retranslation{{ object.translations.count|pluralize }}.</p>
+      <p><strong>The content of this document has been approved for translation.</strong> Making changes to document content will automatically update the English translation and trigger <strong>{{ object.translations.count|add:-1 }}</strong> retranslation{{ object.translations.count|add:-1|pluralize }}.</p>
     {% elif object.approval_status == "waiting" %}
       <p>The content of this document needs review before translation.</p>
     {% elif object.approval_status == "revision" %}

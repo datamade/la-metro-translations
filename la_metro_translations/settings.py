@@ -274,6 +274,11 @@ for host in ALLOWED_HOSTS:
     CSRF_TRUSTED_ORIGINS.append(origin)
 
 # Set up third party sercices
+TRANSLATION_SERVICE = os.getenv(
+    "TRANSLATION_SERVICE",
+    "la_metro_translations.services.translation.DummyTranslationService",
+)
+
 try:
     MISTRAL_API_KEY = os.environ["MISTRAL_API_KEY"]
 except KeyError:

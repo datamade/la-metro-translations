@@ -3,6 +3,7 @@ from wagtail.admin.panels import FieldPanel, MultiFieldPanel, FieldRowPanel
 from wagtail.admin.viewsets.model import ModelViewSet
 from wagtail.admin.filters import WagtailFilterSet
 from wagtail.permissions import ModelPermissionPolicy
+from wagtail.snippets.views.snippets import IndexView
 
 from django_filters import CharFilter, ChoiceFilter
 
@@ -259,12 +260,27 @@ class DocumentTranslationFilterSet(WagtailFilterSet):
         ]
 
 
+class DocumentTranslationIndexView(IndexView):
+    template_name = "wagtailadmin/generic/document_translation_index.html"
+
+    def get_base_queryset(self):
+        return (
+            super()
+            .get_base_queryset()
+            .filter(document_content__approval_status="approved")
+            .exclude(language="en")
+        )
+
+
 class DocumentTranslationViewSet(ModelViewSet):
     model = DocumentTranslation
+
+    add_to_admin_menu = True
     menu_label = "Document Translations"
     menu_icon = "globe"
     menu_order = 202
-    add_to_admin_menu = True
+
+    index_view_class = DocumentTranslationIndexView
     filterset_class = DocumentTranslationFilterSet
 
     list_display = [

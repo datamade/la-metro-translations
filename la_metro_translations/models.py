@@ -1,12 +1,13 @@
 import re
 
+from django.conf import settings
+from django.core.management import call_command
 from django.db import models
 from django.urls import reverse
 from django.utils.html import format_html
-from django.conf import settings
+from django.utils.safestring import mark_safe
 
 from wagtail.images.blocks import ImageChooserBlock  # noqa
-
 from wagtailmarkdown.fields import MarkdownField
 
 
@@ -187,6 +188,50 @@ class DocumentContent(AdminDisplayMixin, models.Model):
             f"Content for {self.document.title} ({self.get_approval_status_display()})"
         )
 
+    def save(self, *args, **kwargs):
+        if self.pk:
+            original_obj = type(self).objects.get(pk=self.pk)
+
+            super().save(*args, **kwargs)
+
+            # Sync English translation content and status with document content & status
+            english_translation = self.translations.filter(language="en")
+
+            if english_translation.exists():
+                english_translation.update(
+                    markdown=self.markdown, approval_status=self.approval_status
+                )
+
+            # If document content needs revision, so do translations
+            if self.approval_status == "revision":
+                self.translations.exclude(language="en").update(
+                    approval_status="revision"
+                )
+
+            # If document content has changed, or if document content is newly approved,
+            # trigger translation & mark non-English translations as waiting for review
+            elif self.approval_status == "approved":
+
+                content_changed = original_obj.markdown != self.markdown
+                content_approved = original_obj.approval_status != "approved"
+
+                if content_changed or content_approved:
+                    # TODO: Probably want to do this asynchronously
+                    for _, language in DocumentTranslation.LANGUAGE_CHOICES:
+                        if language == "English":
+                            continue
+
+                        call_command(
+                            "batch_translate", language, document_content=self.id
+                        )
+
+                    self.translations.exclude(language="en").update(
+                        approval_status="waiting"
+                    )
+
+        else:
+            return super().save(*args, **kwargs)
+
     def document_title(self):
         return self.document.title
 
@@ -238,6 +283,47 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
         return (
             f"{language} translation for {title} ({self.get_approval_status_display()})"
         )
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            original_obj = type(self).objects.get(pk=self.pk)
+            super().save(*args, **kwargs)
+
+            # Create files for translations if content changes or status
+            # changes to approved
+            if self.approval_status == "approved":
+                content_changed = original_obj.markdown != self.markdown
+                content_approved = original_obj.approval_status != "approved"
+
+                if content_changed or content_approved:
+                    call_command("convert_docs", document_translation=self.id)
+
+        else:
+            return super().save(*args, **kwargs)
+
+    def approval_status_display(self):
+        if self.document_content.approval_status == "approved":
+            return super().approval_status_display()
+
+        return mark_safe("<em>Pending</em>")
+
+    def edit_link_display(self):
+        if self.document_content.approval_status == "approved":
+            if self.language == "en":
+                edit_url = reverse(
+                    f"{camel_to_snake(DocumentContent._meta.object_name)}:edit",
+                    args=[self.document_content.pk],
+                )
+                return format_html(
+                    "<a href='{}' class='button button-small'>Manage {}</a>",
+                    edit_url,
+                    self._meta.verbose_name,
+                )
+
+            else:
+                return super().edit_link_display()
+
+        return mark_safe("<em>Pending</em>")
 
     def document_title(self):
         return self.document_content.document.title
