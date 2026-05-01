@@ -11,6 +11,7 @@ jobs:
     uses: ./.github/workflows/run_translation.yml
     with:
       environment: staging
+    secrets: inherit
 
   # production:
   #   uses: ./.github/workflows/run_translation.yml

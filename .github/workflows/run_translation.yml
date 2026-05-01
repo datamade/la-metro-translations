@@ -32,53 +32,51 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
-    environment:
-      name: ${{ inputs.environment }}
     steps:
       - uses: actions/checkout@v4
       - name: Setup tmate session
         uses: mxschmitt/action-tmate@v3
 
-  # extract:
-  #   runs-on: ubuntu-latest
-  #   environment:
-  #     name: ${{ inputs.environment }}
-  #   container:
-  #     image: ghcr.io/datamade/la-metro-translations:${{ inputs.environment == 'production' && 'deploy' || 'main' }}
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v5
-  #
-  #     - name: Run batch extract
-  #       run: python manage.py batch_extract
-  #
-  # translate:
-  #   needs: extract
-  #   runs-on: ubuntu-latest
-  #   environment:
-  #     name: ${{ inputs.environment }}
-  #   strategy:
-  #     matrix:
-  #       language: [spanish]
-  #   container:
-  #     image: ghcr.io/datamade/la-metro-translations:${{ inputs.environment == 'production' && 'deploy' || 'main' }}
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v5
-  #
-  #     - name: Run batch translation
-  #       run: python manage.py batch_translate ${{ matrix.language }}
-  #
-  # convert:
-  #   needs: translate
-  #   runs-on: ubuntu-latest
-  #   environment:
-  #     name: ${{ inputs.environment }}
-  #   container:
-  #     image: ghcr.io/datamade/la-metro-translations:${{ inputs.environment == 'production' && 'deploy' || 'main' }}
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v5
-  #
-  #     - name: Convert docs
-  #       run: python manage.py convert_docs
+  extract:
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+    container:
+      image: ghcr.io/datamade/la-metro-translations:${{ inputs.environment == 'production' && 'deploy' || 'main' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Run batch extract
+        run: python manage.py batch_extract
+
+  translate:
+    needs: extract
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+    strategy:
+      matrix:
+        language: [spanish]
+    container:
+      image: ghcr.io/datamade/la-metro-translations:${{ inputs.environment == 'production' && 'deploy' || 'main' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Run batch translation
+        run: python manage.py batch_translate ${{ matrix.language }}
+
+  convert:
+    needs: translate
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+    container:
+      image: ghcr.io/datamade/la-metro-translations:${{ inputs.environment == 'production' && 'deploy' || 'main' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Convert docs
+        run: python manage.py convert_docs
