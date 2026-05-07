@@ -3,6 +3,7 @@ from datetime import datetime
 
 from django.core.management.base import BaseCommand
 from django.db.models import Q, F
+from django.db import connections
 
 from la_metro_translations.models import (
     Document,
@@ -25,6 +26,10 @@ class Command(BaseCommand):
         "related DocumentContent object or have been updated more recently than their "
         "DocumentContent, then upsert english DocumentTranslation and TranslationFiles."
     )
+
+    def reset_db_connections(self):
+        for conn in connections.all():
+            conn.close_if_unusable_or_obsolete()
 
     def handle(self, **options):
         # Get any documents without content, or
@@ -63,6 +68,9 @@ class Command(BaseCommand):
                     updated_at=now,
                 )
             )
+
+        self.reset_db_connections()
+
         new_contents = DocumentContent.objects.bulk_create(
             contents_to_upsert,
             update_conflicts=True,
