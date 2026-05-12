@@ -3,6 +3,7 @@ from datetime import datetime
 
 from django.core.management.base import BaseCommand
 from django.db.models import F
+from django.db import connections
 
 from la_metro_translations.models import (
     DocumentContent,
@@ -35,6 +36,10 @@ class Command(BaseCommand):
                 "Must be one we currently support."
             ),
         )
+
+    def reset_db_connections(self):
+        for conn in connections.all():
+            conn.close_if_unusable_or_obsolete()
 
     def handle(self, **options):
         supported_languages = [
@@ -77,6 +82,8 @@ class Command(BaseCommand):
         translations = list(
             MistralTranslationService.metered_batch_translate(contents, user_language)
         )
+
+        self.reset_db_connections()
 
         now = datetime.now()
         translations_to_upsert = []
