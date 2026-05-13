@@ -33,6 +33,12 @@ class DocumentSerializer(serializers.ModelSerializer):
             if not isinstance(v, UniqueTogetherValidator)
         ]
 
+    def validate_source_url(self, value):
+        # Mistral requires documents to start with https
+        if value.startswith("http://"):
+            return value.replace("http://", "https://", 1)
+        return value
+
 
 class NotificationSerializer(serializers.Serializer):
     """
