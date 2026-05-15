@@ -3,7 +3,7 @@ import pytest
 from la_metro_translations.panels import PropertyPanel, RelatedObjectsPanel
 from la_metro_translations.models import Document, DocumentContent
 
-from conftest import DocumentTranslationFactory
+from conftest import DocumentTranslationFactory, TranslationLanguageFactory
 
 
 @pytest.mark.django_db
@@ -81,8 +81,9 @@ class TestRelatedObjectsPanel:
     def test_bound_panel_render_complex_query_path(self, document_translation):
         """Test rendering with complex query path (document_content__document)."""
         document = document_translation.document_content.document
+        language = TranslationLanguageFactory(value="en", display_name="English")
         DocumentTranslationFactory(
-            language="english", document_content=document_translation.document_content
+            language=language, document_content=document_translation.document_content
         )
 
         panel = RelatedObjectsPanel(

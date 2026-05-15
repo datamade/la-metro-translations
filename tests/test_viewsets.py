@@ -1,7 +1,12 @@
 import pytest
 from django.urls import reverse
 
-from conftest import DocumentFactory, DocumentContentFactory, DocumentTranslationFactory
+from conftest import (
+    DocumentFactory,
+    DocumentContentFactory,
+    DocumentTranslationFactory,
+    TranslationLanguageFactory,
+)
 
 
 @pytest.mark.django_db
@@ -201,6 +206,7 @@ class TestDocumentTranslationViewSet:
         self, wagtail_user_client, document_translation
     ):
 
+        not_matched_lang = TranslationLanguageFactory(value="fr", display_name="French")
         for i in range(3):
             doc = DocumentFactory(
                 title=f"Not A Match {i}",
@@ -216,7 +222,7 @@ class TestDocumentTranslationViewSet:
             DocumentTranslationFactory(
                 document_content=content,
                 markdown=f"Translation {i}",
-                language="french",
+                language=not_matched_lang,
                 approval_status="revision",
             )
 
@@ -239,7 +245,7 @@ class TestDocumentTranslationViewSet:
 
         # Test language filter
         response = wagtail_user_client.get(
-            url, {"language": document_translation.language}
+            url, {"language": document_translation.language.pk}
         )
         assert response.status_code == 200
         assert "There is 1 match" in response.content.decode()

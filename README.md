@@ -43,8 +43,16 @@ docker compose up
 
 #### Running the tests
 
+To run all tests:
+
 ```bash
 docker compose -f docker-compose.yml -f tests/docker-compose.yml run --rm app
+```
+
+To run a single test:
+
+```bash
+docker compose -f docker-compose.yml -f tests/docker-compose.yml run --rm app pytest tests/name_of_test_file.py::NameOfTestClass::name_of_specific_test
 ```
 
 #### Managing site styles

@@ -29,12 +29,22 @@ class DocumentContentFactory(factory.django.DjangoModelFactory):
     approval_status = "approved"
 
 
+class TranslationLanguageFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = "la_metro_translations.TranslationLanguage"
+        django_get_or_create = ("value", "display_name")
+
+    value = "sp"
+    display_name = "Spanish"
+    auto_approval_enabled = True
+
+
 class DocumentTranslationFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = "la_metro_translations.DocumentTranslation"
 
     markdown = "Jugar querer montaña quince, otro gris más"
-    language = "sp"
+    language = factory.SubFactory(TranslationLanguageFactory)
     approval_status = "waiting"
 
 
