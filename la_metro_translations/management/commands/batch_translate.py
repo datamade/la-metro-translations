@@ -38,11 +38,13 @@ class Command(BaseCommand):
         )
 
     def handle(self, **options):
-        user_language = options["language"].title()
+        user_language = options["language"]
         supported_languages = TranslationLanguage.objects.exclude(value="en")
 
         try:
-            target_language = supported_languages.get(display_name=user_language)
+            target_language = supported_languages.get(
+                display_name__iexact=user_language
+            )
         except TranslationLanguage.DoesNotExist:
             supported_language_names = [
                 lang.display_name for lang in supported_languages

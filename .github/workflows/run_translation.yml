@@ -48,7 +48,16 @@ jobs:
     environment: ${{ inputs.environment }}
     strategy:
       matrix:
-        language: [spanish]
+        language:
+          [
+            spanish,
+            "'mandarin in simplified script'",
+            korean,
+            armenian,
+            vietnamese,
+            russian,
+            japanese,
+          ]
     container:
       image: ghcr.io/datamade/la-metro-translations:${{ inputs.environment == 'production' && 'deploy' || 'main' }}
     steps:
