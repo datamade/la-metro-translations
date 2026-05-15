@@ -6,7 +6,11 @@ import factory
 import pytest
 
 from django.contrib.contenttypes.models import ContentType
-from la_metro_translations.models import Document, DocumentContent, DocumentTranslation
+from la_metro_translations.models import (
+    Document,
+    DocumentContent,
+    DocumentTranslation,
+)
 
 
 class DocumentFactory(factory.django.DjangoModelFactory):
@@ -38,6 +42,22 @@ class DocumentTranslationFactory(factory.django.DjangoModelFactory):
     approval_status = "waiting"
 
 
+class ExtractionConfigFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = "la_metro_translations.ExtractionConfig"
+
+    auto_approve_extractions = True
+
+
+class TranslationConfigFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = "la_metro_translations.TranslationConfig"
+
+    config = factory.SubFactory(ExtractionConfigFactory)
+    language = "sp"
+    auto_approve_translations = True
+
+
 @pytest.fixture
 def document():
     return DocumentFactory()
@@ -51,6 +71,16 @@ def document_content(document):
 @pytest.fixture
 def document_translation(document_content):
     return DocumentTranslationFactory(document_content=document_content)
+
+
+@pytest.fixture
+def extraction_config():
+    return ExtractionConfigFactory()
+
+
+@pytest.fixture
+def translation_config(extraction_config):
+    return TranslationConfigFactory(config=extraction_config)
 
 
 @pytest.fixture

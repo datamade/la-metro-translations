@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime
 
+from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.db.models import F
 from django.db import connections
@@ -42,12 +43,25 @@ class Command(BaseCommand):
             default=None,
             help=("The ID of the document content to translate."),
         )
+        parser.add_argument(
+            "--approval_status",
+            type=str,
+            default="waiting",
+            choices=["waiting", "approved"],
+            help=(
+                "Approval status to set on created or updated translations. "
+                "Defaults to 'waiting'. Pass 'approved' to auto-approve and "
+                "trigger file conversion."
+            ),
+        )
 
     def reset_db_connections(self):
         for conn in connections.all():
             conn.close_if_unusable_or_obsolete()
 
     def handle(self, **options):
+        approval_status = options["approval_status"]
+
         supported_languages = [
             choice
             for choice in DocumentTranslation.LANGUAGE_CHOICES
@@ -126,6 +140,7 @@ class Command(BaseCommand):
                     document_content=content,
                     language=user_language_value,
                     markdown=matched_translation,
+                    approval_status=approval_status,
                     updated_at=now,
                 )
             )
@@ -134,11 +149,16 @@ class Command(BaseCommand):
             document_translations,
             update_conflicts=True,
             unique_fields=["document_content", "language"],
-            update_fields=["markdown", "updated_at"],
+            update_fields=["markdown", "approval_status", "updated_at"],
         )
 
         logger.info(
             f"DocumentContents with updated {user_language} translations: "
             f"{len(new_translations)} out of {len(contents)}"
         )
+
+        if approval_status == "approved":
+            logger.info("Triggering file conversion for approved translations...")
+            call_command("convert_docs")
+
         logger.info("--- Finished! ---")

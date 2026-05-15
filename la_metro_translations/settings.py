@@ -82,6 +82,7 @@ INSTALLED_APPS = [
     "django.contrib.postgres",
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
+    "wagtail.contrib.settings",
     "wagtail.contrib.simple_translation",
     "wagtail.contrib.table_block",
     "wagtail.locales",

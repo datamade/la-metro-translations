@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime
 
+from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.db.models import Q, F
 from django.db import connections
@@ -9,6 +10,8 @@ from la_metro_translations.models import (
     Document,
     DocumentContent,
     DocumentTranslation,
+    ExtractionConfig,
+    TranslationConfig,
     TranslationFile,
 )
 from la_metro_translations.services import MistralOCRService
@@ -45,6 +48,8 @@ class Command(BaseCommand):
 
         extractions = list(MistralOCRService.metered_batch_extract(documents))
         now = datetime.now()
+        config = ExtractionConfig.load()
+        extraction_status = "approved" if config.auto_approve_extractions else "waiting"
 
         # Update DocumentContents
         contents_to_upsert = []
@@ -65,6 +70,7 @@ class Command(BaseCommand):
                 DocumentContent(
                     document=doc,
                     markdown=matched_extraction["markdown"],
+                    approval_status=extraction_status,
                     updated_at=now,
                 )
             )
@@ -75,7 +81,7 @@ class Command(BaseCommand):
             contents_to_upsert,
             update_conflicts=True,
             unique_fields=["document"],
-            update_fields=["markdown", "updated_at"],
+            update_fields=["markdown", "approval_status", "updated_at"],
         )
 
         # Update English DocumentTranslations
@@ -86,6 +92,7 @@ class Command(BaseCommand):
                     document_content=content,
                     language="en",
                     markdown=content.markdown,
+                    approval_status=extraction_status,
                     updated_at=now,
                 )
             )
@@ -93,7 +100,7 @@ class Command(BaseCommand):
             english_translations_to_upsert,
             update_conflicts=True,
             unique_fields=["document_content", "language"],
-            update_fields=["markdown", "updated_at"],
+            update_fields=["markdown", "approval_status", "updated_at"],
         )
 
         # Update TranslationFiles
@@ -118,4 +125,23 @@ class Command(BaseCommand):
             "Documents with updated related content objects: "
             f"{len(new_contents)} out of {len(documents)}"
         )
+
+        if config.auto_approve_extractions:
+            for lang_config in TranslationConfig.objects.filter(config=config):
+                language_display = dict(DocumentTranslation.LANGUAGE_CHOICES)[
+                    lang_config.language
+                ]
+                translation_approval_status = (
+                    "approved" if lang_config.auto_approve_translations else "waiting"
+                )
+                logger.info(
+                    f"Triggering {language_display} translations "
+                    f"(approval_status={translation_approval_status})..."
+                )
+                call_command(
+                    "batch_translate",
+                    language_display,
+                    approval_status=translation_approval_status,
+                )
+
         logger.info("--- Finished! ---")

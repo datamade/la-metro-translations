@@ -2,13 +2,16 @@ from wagtail import hooks
 from wagtail.admin.panels import FieldPanel, MultiFieldPanel, FieldRowPanel
 from wagtail.admin.viewsets.model import ModelViewSet
 from wagtail.admin.filters import WagtailFilterSet
+from wagtail.contrib.settings.registry import register_setting
 from wagtail.permissions import ModelPermissionPolicy
 from wagtail.snippets.views.snippets import IndexView
 
 from django_filters import CharFilter, ChoiceFilter
 
-from .models import Document, DocumentContent, DocumentTranslation
+from .models import Document, DocumentContent, DocumentTranslation, ExtractionConfig
 from .panels import PropertyPanel, RelatedObjectsPanel
+
+register_setting(ExtractionConfig, icon="cog")
 
 
 class ReadEditOnlyPermissionPolicy(ModelPermissionPolicy):
