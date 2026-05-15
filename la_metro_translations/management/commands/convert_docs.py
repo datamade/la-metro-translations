@@ -3,7 +3,11 @@ from datetime import datetime
 from django.core.management.base import BaseCommand
 from django.db.models import OuterRef, Subquery
 
-from la_metro_translations.models import DocumentTranslation, TranslationFile
+from la_metro_translations.models import (
+    DocumentTranslation,
+    TranslationFile,
+    TranslationLanguage,
+)
 from la_metro_translations.services import DocumentTranslationConverter
 
 logger = logging.getLogger(__name__)
@@ -17,6 +21,7 @@ class Command(BaseCommand):
         Creates up to date RTF and PDF translation files for those that need them.
         """
         files_to_create = []
+        english_language_obj = TranslationLanguage.objects.get(value="en")
 
         # Create RTFs
         up_to_date_rtfs = TranslationFile.objects.filter(
@@ -25,14 +30,14 @@ class Command(BaseCommand):
             document_translation=OuterRef("pk"),
         )
 
-        eng_rtfs_to_create = DocumentTranslation.objects.filter(language="en").exclude(
-            pk__in=Subquery(up_to_date_rtfs.values("document_translation"))
-        )
+        eng_rtfs_to_create = DocumentTranslation.objects.filter(
+            language=english_language_obj
+        ).exclude(pk__in=Subquery(up_to_date_rtfs.values("document_translation")))
         for doc in eng_rtfs_to_create:
             files_to_create.append(DocumentTranslationConverter(doc).convert_to_rtf())
 
         non_eng_rtfs_to_create = DocumentTranslation.objects.exclude(
-            language="en"
+            language=english_language_obj
         ).exclude(pk__in=Subquery(up_to_date_rtfs.values("document_translation")))
         for doc in non_eng_rtfs_to_create:
             files_to_create.append(DocumentTranslationConverter(doc).convert_to_rtf())
@@ -45,7 +50,7 @@ class Command(BaseCommand):
         )
 
         non_eng_pdfs_to_create = DocumentTranslation.objects.exclude(
-            language="en"
+            language=english_language_obj
         ).exclude(pk__in=Subquery(up_to_date_pdfs.values("document_translation")))
         for doc in non_eng_pdfs_to_create:
             files_to_create.append(DocumentTranslationConverter(doc).convert_to_pdf())

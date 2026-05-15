@@ -7,6 +7,7 @@ from django.db.models import F
 from la_metro_translations.models import (
     DocumentContent,
     DocumentTranslation,
+    TranslationLanguage,
 )
 from la_metro_translations.services import MistralTranslationService
 
@@ -37,22 +38,19 @@ class Command(BaseCommand):
         )
 
     def handle(self, **options):
-        supported_languages = [
-            choice
-            for choice in DocumentTranslation.LANGUAGE_CHOICES
-            if choice[0] != "en"
-        ]
-
         user_language = options["language"].title()
-        user_language_value = next(  # ie. "es"
-            (lang[0] for lang in supported_languages if lang[1] == user_language),
-            None,
-        )
-        if not user_language_value:
-            display_choices = [choice[1] for choice in supported_languages]
+        supported_languages = TranslationLanguage.objects.exclude(value="en")
+
+        try:
+            target_language = supported_languages.get(display_name=user_language)
+        except TranslationLanguage.DoesNotExist:
+            supported_language_names = [
+                lang.display_name for lang in supported_languages
+            ]
             raise ValueError(
                 f"This suite does not support translations to {user_language}. "
-                f"Currently supported languages are: {', '.join(display_choices)}"
+                "Currently supported languages are: "
+                f"{', '.join(supported_language_names)}"
             )
 
         # Get any document contents without translations in this language, or
@@ -61,7 +59,7 @@ class Command(BaseCommand):
             DocumentContent.objects.select_related("document")
             .exclude(
                 translations__updated_at__gte=F("updated_at"),
-                translations__language=user_language_value,
+                translations__language=target_language,
             )
             .distinct()
         )
@@ -96,7 +94,7 @@ class Command(BaseCommand):
             translations_to_upsert.append(
                 DocumentTranslation(
                     document_content=content,
-                    language=user_language_value,
+                    language=target_language,
                     markdown=matched_translation["markdown"],
                     updated_at=now,
                 )

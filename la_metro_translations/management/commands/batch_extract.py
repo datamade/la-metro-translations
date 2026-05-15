@@ -9,6 +9,7 @@ from la_metro_translations.models import (
     DocumentContent,
     DocumentTranslation,
     TranslationFile,
+    TranslationLanguage,
 )
 from la_metro_translations.services import MistralOCRService
 
@@ -76,7 +77,7 @@ class Command(BaseCommand):
             english_translations_to_upsert.append(
                 DocumentTranslation(
                     document_content=content,
-                    language="en",
+                    language=TranslationLanguage.objects.get(value="en"),
                     markdown=content.markdown,
                     updated_at=now,
                 )

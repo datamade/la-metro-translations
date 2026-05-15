@@ -34,7 +34,7 @@ class DocumentTranslationConverter:
             raise DocumentTranslationConverterError(f"Conversion failed: {e}")
 
         filename = self.doc_translation.document_content.document.title
-        language = self.doc_translation.language
+        language = self.doc_translation.language.value
 
         buffer = io.BytesIO()
         buffer.write(pdf_bytes)
@@ -68,7 +68,7 @@ class DocumentTranslationConverter:
 
         filename = self.doc_translation.document_content.document.title
         content_type = "application/rtf"
-        language = self.doc_translation.language
+        language = self.doc_translation.language.value
 
         # Add encoding strings to make sure file renders correctly
         pre_bytes = (
