@@ -4,9 +4,9 @@ from wagtail.admin.viewsets.model import ModelViewSet
 from wagtail.admin.filters import WagtailFilterSet
 from wagtail.permissions import ModelPermissionPolicy
 
-from django_filters import CharFilter, ChoiceFilter
+from django_filters import CharFilter, ChoiceFilter, ModelChoiceFilter
 
-from .models import Document, DocumentContent, DocumentTranslation
+from .models import Document, DocumentContent, DocumentTranslation, TranslationLanguage
 from .panels import PropertyPanel, RelatedObjectsPanel
 
 
@@ -241,8 +241,8 @@ class DocumentTranslationFilterSet(WagtailFilterSet):
         choices=Document.ENTITY_TYPE_CHOICES, label="Entity Type"
     )
     document_content__document__entity_id = CharFilter(label="Entity ID")
-    language = ChoiceFilter(
-        choices=DocumentTranslation.LANGUAGE_CHOICES, label="Language"
+    language = ModelChoiceFilter(
+        queryset=TranslationLanguage.objects.all(), label="Language"
     )
     approval_status = ChoiceFilter(
         choices=DocumentTranslation.APPROVAL_STATUS_CHOICES, label="Approval Status"

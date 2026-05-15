@@ -191,6 +191,19 @@ class DocumentContent(AdminDisplayMixin, models.Model):
     document_title.short_description = "Title"
 
 
+class TranslationLanguage(models.Model):
+    """
+    The languages available for a given translation
+    """
+
+    value = models.CharField(unique=True)
+    display_name = models.CharField(unique=True)
+    auto_approval_enabled = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.display_name
+
+
 class DocumentTranslation(AdminDisplayMixin, models.Model):
     """
     The translated version of a document's extracted content.
@@ -205,10 +218,6 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
         ]
         ordering = ["-updated_at"]
 
-    LANGUAGE_CHOICES = [
-        ("en", "English"),
-        ("sp", "Spanish"),
-    ]
     APPROVAL_STATUS_CHOICES = [
         ("approved", "Approved for Publishing"),
         ("waiting", "Waiting for Initial Review"),
@@ -216,7 +225,12 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
     ]
 
     markdown = models.TextField()
-    language = models.CharField(choices=LANGUAGE_CHOICES)
+    language = models.ForeignKey(
+        TranslationLanguage,
+        related_name="translations",
+        on_delete=models.CASCADE,
+        null=True,
+    )
     approval_status = models.CharField(
         choices=APPROVAL_STATUS_CHOICES, default="waiting"
     )
@@ -241,6 +255,9 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
         return self.document_content.document.title
 
     document_title.short_description = "Document Name"
+
+    def get_language_display(self):
+        return self.language.display_name if self.language else None
 
     def language_display(self):
         return format_html(
@@ -306,7 +323,7 @@ class TranslationFile(models.Model):
         super().delete()
 
     def get_file(self):
-        if self.format == "pdf" and self.document_translation.language == "en":
+        if self.format == "pdf" and self.document_translation.language.value == "en":
             return self.document_translation.document_content.document.source_url
 
         return self.file

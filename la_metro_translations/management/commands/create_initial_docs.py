@@ -9,6 +9,7 @@ from la_metro_translations.models import (
     DocumentContent,
     DocumentTranslation,
     TranslationFile,
+    TranslationLanguage,
 )
 
 
@@ -21,7 +22,7 @@ class Command(BaseCommand):
         md_text = doc_translation.markdown or ""
 
         base_filename = doc_translation.document_content.document.title
-        language = doc_translation.language
+        language = doc_translation.language.value
         filename = f"{base_filename}_{language}.md"
 
         fileobj = io.BytesIO(md_text.encode("utf-8"))
@@ -107,7 +108,7 @@ class Command(BaseCommand):
         for content in (c1, c2):
             te = DocumentTranslation.objects.create(
                 document_content=content,
-                language="en",
+                language=TranslationLanguage.objects.get(value="en"),
                 markdown=f"# {content.document.title} (EN)\n\nTranslated EN",
             )
             self.stdout.write(
@@ -115,7 +116,7 @@ class Command(BaseCommand):
             )
             ts = DocumentTranslation.objects.create(
                 document_content=content,
-                language="sp",
+                language=TranslationLanguage.objects.get(value="sp"),
                 markdown=f"# {content.document.title} (ES)\n\nTraducido ES",
             )
             self.stdout.write(
