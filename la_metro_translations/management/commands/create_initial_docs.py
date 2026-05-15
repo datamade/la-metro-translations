@@ -116,7 +116,7 @@ class Command(BaseCommand):
             )
             ts = DocumentTranslation.objects.create(
                 document_content=content,
-                language=TranslationLanguage.objects.get(value="sp"),
+                language=TranslationLanguage.objects.get(value="es"),
                 markdown=f"# {content.document.title} (ES)\n\nTraducido ES",
             )
             self.stdout.write(

@@ -34,7 +34,7 @@ class TranslationLanguageFactory(factory.django.DjangoModelFactory):
         model = "la_metro_translations.TranslationLanguage"
         django_get_or_create = ("value", "display_name")
 
-    value = "sp"
+    value = "es"
     display_name = "Spanish"
     auto_approval_enabled = True
 
