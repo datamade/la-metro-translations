@@ -355,6 +355,27 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
 
     language_display.short_description = "Language"
 
+    def file_formats_display(self):
+        if getattr(self, "files", False):
+            files_btns = ""
+            for f in self.files.all():
+                files_btns += (
+                    "<a class='button'"
+                    "style='width: stretch; font-weight: bold; text-align: center;'"
+                    f"target='_blank' href='{f.get_file_url()}'>{f.format.upper()}</a>"
+                )
+
+            return format_html(
+                "<div style='display: flex; justify-content: space-between'>{}</div>",
+                mark_safe(files_btns),
+            )
+
+        return mark_safe(
+            "<p>This translation is not yet available in other file formats.</p>"
+        )
+
+    file_formats_display.short_description = "File Formats"
+
 
 def translation_file_path(instance, filename):
     year = instance.document_translation.document_content.document.created_at.year
@@ -411,7 +432,7 @@ class TranslationFile(models.Model):
         self.file.delete(save=False)
         super().delete()
 
-    def get_file(self):
+    def get_file_url(self):
         if self.format == "pdf" and self.document_translation.language == "en":
             return self.document_translation.document_content.document.source_url
 
