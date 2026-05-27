@@ -41,7 +41,7 @@ class Command(BaseCommand):
             try:
                 rtf_file = DocumentTranslationConverter(doc).convert_to_rtf()
             except DocumentTranslationConverterError as e:
-                logger.error(f"Error while converting {doc}: {e}")
+                logger.error(f"Error while converting {doc} to RTF: {e}")
             else:
                 files_to_create.append(rtf_file)
 
@@ -59,7 +59,7 @@ class Command(BaseCommand):
             try:
                 pdf_file = DocumentTranslationConverter(doc).convert_to_pdf()
             except DocumentTranslationConverterError as e:
-                logger.error(f"Error while converting {doc}: {e}")
+                logger.error(f"Error while converting {doc} to PDF: {e}")
             else:
                 files_to_create.append(pdf_file)
 
