@@ -255,6 +255,30 @@ class DocumentContent(AdminDisplayMixin, models.Model):
 
     document_title.short_description = "Title"
 
+    def file_formats_display(self):
+        files_btn_fragment = (
+            "<a class='button'"
+            "style='width: stretch; font-weight: bold; text-align: center;'"
+            "target='_blank' href='{}'>{}</a>"
+        )
+        files_btns = files_btn_fragment.format(self.document.source_url, "Original PDF")
+
+        try:
+            rtf = self.translations.get(language="en").files.get(format="rtf")
+        except (DocumentTranslation.DoesNotExist, TranslationFile.DoesNotExist):
+            pass
+        else:
+            files_btns += files_btn_fragment.format(
+                rtf.get_file_url(), rtf.format.upper()
+            )
+
+        return format_html(
+            "<div style='display: flex; justify-content: space-between'>{}</div>",
+            mark_safe(files_btns),
+        )
+
+    file_formats_display.short_description = "File Formats"
+
 
 class DocumentTranslation(AdminDisplayMixin, models.Model):
     """
