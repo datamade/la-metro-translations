@@ -4,7 +4,10 @@ from django.core.management.base import BaseCommand
 from django.db.models import OuterRef, Subquery
 
 from la_metro_translations.models import DocumentTranslation, TranslationFile
-from la_metro_translations.services import DocumentTranslationConverter
+from la_metro_translations.services import (
+    DocumentTranslationConverter,
+    DocumentTranslationConverterError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -28,14 +31,19 @@ class Command(BaseCommand):
         eng_rtfs_to_create = DocumentTranslation.objects.filter(language="en").exclude(
             pk__in=Subquery(up_to_date_rtfs.values("document_translation"))
         )
-        for doc in eng_rtfs_to_create:
-            files_to_create.append(DocumentTranslationConverter(doc).convert_to_rtf())
 
         non_eng_rtfs_to_create = DocumentTranslation.objects.exclude(
             language="en"
         ).exclude(pk__in=Subquery(up_to_date_rtfs.values("document_translation")))
-        for doc in non_eng_rtfs_to_create:
-            files_to_create.append(DocumentTranslationConverter(doc).convert_to_rtf())
+
+        all_rtfs_to_create = eng_rtfs_to_create.union(non_eng_rtfs_to_create)
+        for doc in all_rtfs_to_create:
+            try:
+                rtf_file = DocumentTranslationConverter(doc).convert_to_rtf()
+            except DocumentTranslationConverterError as e:
+                logger.error(f"Error while converting {doc}: {e}")
+            else:
+                files_to_create.append(rtf_file)
 
         # Create PDFs
         up_to_date_pdfs = TranslationFile.objects.filter(
@@ -48,10 +56,15 @@ class Command(BaseCommand):
             language="en"
         ).exclude(pk__in=Subquery(up_to_date_pdfs.values("document_translation")))
         for doc in non_eng_pdfs_to_create:
-            files_to_create.append(DocumentTranslationConverter(doc).convert_to_pdf())
+            try:
+                pdf_file = DocumentTranslationConverter(doc).convert_to_pdf()
+            except DocumentTranslationConverterError as e:
+                logger.error(f"Error while converting {doc}: {e}")
+            else:
+                files_to_create.append(pdf_file)
 
         if not files_to_create:
-            logger.info("All translations have up to date rtfs and pdfs!")
+            logger.info("All translations have up to date RTFs and PDFs!")
             return
 
         for file in files_to_create:
