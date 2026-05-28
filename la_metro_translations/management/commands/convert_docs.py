@@ -4,7 +4,10 @@ from django.core.management.base import BaseCommand
 from django.db.models import OuterRef, Subquery
 
 from la_metro_translations.models import DocumentTranslation, TranslationFile
-from la_metro_translations.services import DocumentTranslationConverter
+from la_metro_translations.services import (
+    DocumentTranslationConverter,
+    DocumentTranslationConverterError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +56,12 @@ class Command(BaseCommand):
         for doc in DocumentTranslation.objects.exclude(
             pk__in=Subquery(up_to_date_rtfs.values("document_translation")),
         ):
-            files_to_create.append(DocumentTranslationConverter(doc).convert_to_rtf())
+            try:
+                rtf_file = DocumentTranslationConverter(doc).convert_to_rtf()
+            except DocumentTranslationConverterError as e:
+                logger.error(f"Error while converting {doc} to RTF: {e}")
+            else:
+                files_to_create.append(rtf_file)
 
         # Create PDFs
         up_to_date_pdfs = TranslationFile.objects.filter(
@@ -66,10 +74,15 @@ class Command(BaseCommand):
             pk__in=Subquery(up_to_date_pdfs.values("document_translation")),
             language="en",
         ):
-            files_to_create.append(DocumentTranslationConverter(doc).convert_to_pdf())
+            try:
+                pdf_file = DocumentTranslationConverter(doc).convert_to_pdf()
+            except DocumentTranslationConverterError as e:
+                logger.error(f"Error while converting {doc} to PDF: {e}")
+            else:
+                files_to_create.append(pdf_file)
 
         if not files_to_create:
-            logger.info("All translations have up to date rtfs and pdfs!")
+            logger.info("All translations have up to date RTFs and PDFs!")
             return
 
         self.bulk_create_translation_files(files_to_create)

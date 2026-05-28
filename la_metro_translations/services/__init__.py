@@ -1,7 +1,10 @@
 from django.conf import settings
 from django.utils.module_loading import import_string
 
-from .conversion import DocumentTranslationConverter  # noqa
+from .conversion import (
+    DocumentTranslationConverter,
+    DocumentTranslationConverterError,
+)
 from .ocr import MistralOCRService  # noqa
 from .translation import DummyTranslationService, MistralTranslationService  # noqa
 
