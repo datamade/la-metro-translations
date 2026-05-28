@@ -3,7 +3,7 @@ FROM node:25-slim AS node
 COPY ./package.json package.json
 RUN npm install
 
-FROM python:3.14.2 AS app
+FROM python:3.14 AS app
 
 LABEL maintainer "DataMade <info@datamade.us>"
 
