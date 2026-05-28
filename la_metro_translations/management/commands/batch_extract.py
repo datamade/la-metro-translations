@@ -48,8 +48,10 @@ class Command(BaseCommand):
 
         extractions = list(MistralOCRService.metered_batch_extract(documents))
         now = datetime.now()
-        config = ExtractionConfig.load()
-        extraction_status = "approved" if config.auto_approve_extractions else "waiting"
+        extraction_config = ExtractionConfig.load()
+        extraction_status = (
+            "approved" if extraction_config.auto_approve_extractions else "waiting"
+        )
 
         # Update DocumentContents
         contents_to_upsert = []
@@ -126,21 +128,25 @@ class Command(BaseCommand):
             f"{len(new_contents)} out of {len(documents)}"
         )
 
-        if config.auto_approve_extractions:
-            for lang_config in TranslationConfig.objects.filter(config=config):
-                language_display = dict(DocumentTranslation.LANGUAGE_CHOICES)[
-                    lang_config.language
+        if extraction_config.auto_approve_extractions:
+            for translation_config in TranslationConfig.objects.filter(
+                config=extraction_config
+            ):
+                language_str = dict(DocumentTranslation.LANGUAGE_CHOICES)[
+                    translation_config.language
                 ]
                 translation_approval_status = (
-                    "approved" if lang_config.auto_approve_translations else "waiting"
+                    "approved"
+                    if translation_config.auto_approve_translations
+                    else "waiting"
                 )
                 logger.info(
-                    f"Triggering {language_display} translations "
+                    f"Triggering {language_str} translations "
                     f"(approval_status={translation_approval_status})..."
                 )
                 call_command(
                     "batch_translate",
-                    language_display,
+                    language_str,
                     approval_status=translation_approval_status,
                 )
 
