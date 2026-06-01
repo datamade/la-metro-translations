@@ -14,7 +14,7 @@ from django.db.models import QuerySet
 from mistralai import Mistral
 from mistralai.models.sdkerror import SDKError
 
-from la_metro_translations.models import Document, DocumentContent
+from la_metro_translations.models import DocumentContent
 
 logger = logging.getLogger(__name__)
 with open("la_metro_translations/prompt.txt") as f:
@@ -24,7 +24,7 @@ with open("la_metro_translations/prompt.txt") as f:
 class TranslationService(ABC):
     @staticmethod
     @abstractmethod
-    def translate_text(document: Document, dest_language: str) -> str | None:
+    def translate_text(content: DocumentContent, dest_language: str) -> str | None:
         pass
 
     @staticmethod
@@ -33,6 +33,34 @@ class TranslationService(ABC):
         contents: Union[QuerySet, List[DocumentContent]], dest_language: str
     ) -> Generator[dict] | None:
         pass
+
+    @staticmethod
+    @abstractmethod
+    def metered_batch_translate(
+        contents: Union[QuerySet, List[DocumentContent]], language: str
+    ) -> Generator[dict] | None:
+        pass
+
+
+class DummyTranslationService(TranslationService):
+    @staticmethod
+    def translate_text(content, dest_language):
+        return f"{dest_language} content:\n{content.markdown}"
+
+    @staticmethod
+    def batch_translate(contents, dest_language):
+        for content in contents:
+            yield {
+                "document_type": content.document.document_type,
+                "document_id": content.document.document_id,
+                "markdown": DummyTranslationService.translate_text(
+                    content, dest_language
+                ),
+            }
+
+    @staticmethod
+    def metered_batch_translate(contents, dest_language):
+        yield from DummyTranslationService.batch_translate(contents, dest_language)
 
 
 class MistralTranslationService(TranslationService):

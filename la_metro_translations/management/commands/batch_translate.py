@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime
 
+from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.db.models import F
 from django.db import connections
@@ -9,7 +10,7 @@ from la_metro_translations.models import (
     DocumentContent,
     DocumentTranslation,
 )
-from la_metro_translations.services import MistralTranslationService
+from la_metro_translations.services import get_translation_service
 
 logger = logging.getLogger(__name__)
 
@@ -36,12 +37,31 @@ class Command(BaseCommand):
                 "Must be one we currently support."
             ),
         )
+        parser.add_argument(
+            "--document_content",
+            type=int,
+            default=None,
+            help=("The ID of the document content to translate."),
+        )
+        parser.add_argument(
+            "--approval_status",
+            type=str,
+            default="waiting",
+            choices=["waiting", "approved"],
+            help=(
+                "Approval status to set on created or updated translations. "
+                "Defaults to 'waiting'. Pass 'approved' to auto-approve and "
+                "trigger file conversion."
+            ),
+        )
 
     def reset_db_connections(self):
         for conn in connections.all():
             conn.close_if_unusable_or_obsolete()
 
     def handle(self, **options):
+        approval_status = options["approval_status"]
+
         supported_languages = [
             choice
             for choice in DocumentTranslation.LANGUAGE_CHOICES
@@ -60,16 +80,28 @@ class Command(BaseCommand):
                 f"Currently supported languages are: {', '.join(display_choices)}"
             )
 
-        # Get any document contents without translations in this language, or
-        # contents that have been updated more recently than their translation.
-        contents = (
-            DocumentContent.objects.select_related("document")
-            .exclude(
-                translations__updated_at__gte=F("updated_at"),
-                translations__language=user_language_value,
+        if document_content_id := options["document_content"]:
+            contents = DocumentContent.objects.select_related("document").filter(
+                id=document_content_id
             )
-            .distinct()
-        )
+
+            if not contents.exists():
+                raise ValueError(
+                    f"Document content with the specified ID '{document_content_id}' "
+                    "does not exist"
+                )
+
+        else:
+            # Get any document contents without translations in this language, or
+            # contents that have been updated more recently than their translation.
+            contents = (
+                DocumentContent.objects.select_related("document")
+                .exclude(
+                    translations__updated_at__gte=F("updated_at"),
+                    translations__language=user_language_value,
+                )
+                .distinct()
+            )
 
         if len(contents) == 0:
             logger.info(f"All Documents have up to date {user_language} translations!")
@@ -79,45 +111,54 @@ class Command(BaseCommand):
                 f"Translating {len(contents)} DocumentContent(s) to {user_language}..."
             )
 
-        translations = list(
-            MistralTranslationService.metered_batch_translate(contents, user_language)
-        )
+        translated_contents = {
+            t["document_id"]: t["markdown"]
+            for t in get_translation_service().metered_batch_translate(
+                contents, user_language
+            )
+        }
 
         self.reset_db_connections()
 
         now = datetime.now()
-        translations_to_upsert = []
+        document_translations = []
+
         for content in contents:
-            matched_translation = {}
-            for translation in translations:
-                if (
-                    translation["document_type"] == content.document.document_type
-                    and translation["document_id"] == content.document.document_id
-                ):
-                    matched_translation = translation
-                    break
+            matched_translation = translated_contents.get(
+                content.document.document_id, None
+            )
 
             if not matched_translation:
+                logger.warning(
+                    f"Translation not found for document {content.document.id} "
+                    f"with document ID {content.document.document_id}"
+                )
                 continue
 
-            translations_to_upsert.append(
+            document_translations.append(
                 DocumentTranslation(
                     document_content=content,
                     language=user_language_value,
-                    markdown=matched_translation["markdown"],
+                    markdown=matched_translation,
+                    approval_status=approval_status,
                     updated_at=now,
                 )
             )
 
         new_translations = DocumentTranslation.objects.bulk_create(
-            translations_to_upsert,
+            document_translations,
             update_conflicts=True,
             unique_fields=["document_content", "language"],
-            update_fields=["markdown", "updated_at"],
+            update_fields=["markdown", "approval_status", "updated_at"],
         )
 
         logger.info(
             f"DocumentContents with updated {user_language} translations: "
             f"{len(new_translations)} out of {len(contents)}"
         )
+
+        if approval_status == "approved":
+            logger.info("Triggering file conversion for approved translations...")
+            call_command("convert_docs")
+
         logger.info("--- Finished! ---")

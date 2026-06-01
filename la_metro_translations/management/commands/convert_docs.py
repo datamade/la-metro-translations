@@ -15,10 +15,35 @@ logger = logging.getLogger(__name__)
 class Command(BaseCommand):
     help = "Creates RTF and PDF translation files"
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--document_translation",
+            type=int,
+            default=None,
+            help="The ID of the document translation to convert.",
+        )
+
     def handle(self, *args, **options):
         """
         Creates up to date RTF and PDF translation files for those that need them.
         """
+        document_translation_id = options["document_translation"]
+
+        if document_translation_id:
+            self.convert_doc(document_translation_id)
+
+        else:
+            self.convert_docs()
+
+    def convert_doc(self, document_translation_id):
+        doc = DocumentTranslation.objects.get(id=document_translation_id)
+        converter = DocumentTranslationConverter(doc)
+        files_to_create = [converter.convert_to_rtf()]
+        if doc.language != "en":
+            files_to_create.append(converter.convert_to_pdf())
+        self.bulk_create_translation_files(files_to_create)
+
+    def convert_docs(self):
         files_to_create = []
 
         # Create RTFs
@@ -28,16 +53,9 @@ class Command(BaseCommand):
             document_translation=OuterRef("pk"),
         )
 
-        eng_rtfs_to_create = DocumentTranslation.objects.filter(language="en").exclude(
-            pk__in=Subquery(up_to_date_rtfs.values("document_translation"))
-        )
-
-        non_eng_rtfs_to_create = DocumentTranslation.objects.exclude(
-            language="en"
-        ).exclude(pk__in=Subquery(up_to_date_rtfs.values("document_translation")))
-
-        all_rtfs_to_create = eng_rtfs_to_create.union(non_eng_rtfs_to_create)
-        for doc in all_rtfs_to_create:
+        for doc in DocumentTranslation.objects.exclude(
+            pk__in=Subquery(up_to_date_rtfs.values("document_translation")),
+        ):
             try:
                 rtf_file = DocumentTranslationConverter(doc).convert_to_rtf()
             except DocumentTranslationConverterError as e:
@@ -52,10 +70,10 @@ class Command(BaseCommand):
             document_translation=OuterRef("pk"),
         )
 
-        non_eng_pdfs_to_create = DocumentTranslation.objects.exclude(
-            language="en"
-        ).exclude(pk__in=Subquery(up_to_date_pdfs.values("document_translation")))
-        for doc in non_eng_pdfs_to_create:
+        for doc in DocumentTranslation.objects.exclude(
+            pk__in=Subquery(up_to_date_pdfs.values("document_translation")),
+            language="en",
+        ):
             try:
                 pdf_file = DocumentTranslationConverter(doc).convert_to_pdf()
             except DocumentTranslationConverterError as e:
@@ -67,6 +85,9 @@ class Command(BaseCommand):
             logger.info("All translations have up to date RTFs and PDFs!")
             return
 
+        self.bulk_create_translation_files(files_to_create)
+
+    def bulk_create_translation_files(self, files_to_create):
         for file in files_to_create:
             file.updated_at = datetime.now()
 

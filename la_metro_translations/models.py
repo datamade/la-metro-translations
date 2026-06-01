@@ -1,11 +1,19 @@
 import re
 
+from django.conf import settings
+from django.core.management import call_command
 from django.db import models
 from django.urls import reverse
 from django.utils.html import format_html
-from django.conf import settings
+from django.utils.safestring import mark_safe
 
+from modelcluster.fields import ParentalKey
+from modelcluster.models import ClusterableModel
+from wagtail.admin.panels import FieldPanel, InlinePanel
+from wagtail.contrib.settings.models import BaseGenericSetting
 from wagtail.images.blocks import ImageChooserBlock  # noqa
+from wagtail.models import Orderable
+from wagtailmarkdown.fields import MarkdownField
 
 
 def camel_to_snake(name):
@@ -166,7 +174,7 @@ class DocumentContent(AdminDisplayMixin, models.Model):
         ("revision", "Needs Revision"),
     ]
 
-    markdown = models.TextField()
+    markdown = MarkdownField()
     approval_status = models.CharField(
         choices=APPROVAL_STATUS_CHOICES, default="waiting"
     )
@@ -184,6 +192,63 @@ class DocumentContent(AdminDisplayMixin, models.Model):
         return (
             f"Content for {self.document.title} ({self.get_approval_status_display()})"
         )
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            original_obj = type(self).objects.get(pk=self.pk)
+
+            super().save(*args, **kwargs)
+
+            # Sync English translation content and status with document content & status
+            english_translation = self.translations.filter(language="en")
+
+            if english_translation.exists():
+                english_translation.update(
+                    markdown=self.markdown, approval_status=self.approval_status
+                )
+
+            # If document content needs revision, so do translations
+            if self.approval_status == "revision":
+                self.translations.exclude(language="en").update(
+                    approval_status="revision"
+                )
+
+            # If document content has changed, or if document content is newly approved,
+            # trigger translation with approval status determined by language config
+            elif self.approval_status == "approved":
+
+                content_changed = original_obj.markdown != self.markdown
+                content_approved = original_obj.approval_status != "approved"
+
+                if content_changed or content_approved:
+                    config = ExtractionConfig.load()
+
+                    # TODO: Probably want to do this asynchronously
+                    for (
+                        language_code,
+                        language_display,
+                    ) in DocumentTranslation.LANGUAGE_CHOICES:
+                        if language_code == "en":
+                            continue
+
+                        lang_config = config.language_configs.filter(
+                            language=language_code
+                        ).first()
+                        translation_approval_status = (
+                            "approved"
+                            if lang_config and lang_config.auto_approve_translations
+                            else "waiting"
+                        )
+
+                        call_command(
+                            "batch_translate",
+                            language_display,
+                            document_content=self.id,
+                            approval_status=translation_approval_status,
+                        )
+
+        else:
+            return super().save(*args, **kwargs)
 
     def document_title(self):
         return self.document.title
@@ -215,7 +280,7 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
         ("revision", "Needs Revision"),
     ]
 
-    markdown = models.TextField()
+    markdown = MarkdownField()
     language = models.CharField(choices=LANGUAGE_CHOICES)
     approval_status = models.CharField(
         choices=APPROVAL_STATUS_CHOICES, default="waiting"
@@ -236,6 +301,47 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
         return (
             f"{language} translation for {title} ({self.get_approval_status_display()})"
         )
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            original_obj = type(self).objects.get(pk=self.pk)
+            super().save(*args, **kwargs)
+
+            # Create files for translations if content changes or status
+            # changes to approved
+            if self.approval_status == "approved":
+                content_changed = original_obj.markdown != self.markdown
+                content_approved = original_obj.approval_status != "approved"
+
+                if content_changed or content_approved:
+                    call_command("convert_docs", document_translation=self.id)
+
+        else:
+            return super().save(*args, **kwargs)
+
+    def approval_status_display(self):
+        if self.document_content.approval_status == "approved":
+            return super().approval_status_display()
+
+        return mark_safe("<em>Pending</em>")
+
+    def edit_link_display(self):
+        if self.document_content.approval_status == "approved":
+            if self.language == "en":
+                edit_url = reverse(
+                    f"{camel_to_snake(DocumentContent._meta.object_name)}:edit",
+                    args=[self.document_content.pk],
+                )
+                return format_html(
+                    "<a href='{}' class='button button-small'>Manage {}</a>",
+                    edit_url,
+                    self._meta.verbose_name,
+                )
+
+            else:
+                return super().edit_link_display()
+
+        return mark_safe("<em>Pending</em>")
 
     def document_title(self):
         return self.document_content.document.title
@@ -310,3 +416,141 @@ class TranslationFile(models.Model):
             return self.document_translation.document_content.document.source_url
 
         return self.file
+
+
+class ExtractionConfig(BaseGenericSetting, ClusterableModel):
+    """
+    Global configuration for the document processing pipeline.
+
+    Controls whether extracted content and translations are automatically
+    approved, or held for human review before proceeding.
+    """
+
+    auto_approve_extractions = models.BooleanField(
+        default=True,
+        help_text=(
+            "Automatically approve extracted document content for translation. "
+            "Content marked as Needs Revision will not be auto-approved."
+        ),
+    )
+
+    panels = [
+        FieldPanel("auto_approve_extractions"),
+        InlinePanel(
+            "language_configs",
+            heading="Language Translation Settings",
+            help_text=(
+                "Configure auto-approval for each supported translation language. "
+                "Add one row per language."
+            ),
+        ),
+    ]
+
+    class Meta:
+        verbose_name = "Extraction Configuration"
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            original = type(self).objects.get(pk=self.pk)
+            super().save(*args, **kwargs)
+
+            # When auto_approve_extractions is turned on, catch up all waiting
+            # content (but never touch revision content).
+            if not original.auto_approve_extractions and self.auto_approve_extractions:
+                DocumentContent.objects.filter(approval_status="waiting").update(
+                    approval_status="approved"
+                )
+                DocumentTranslation.objects.filter(
+                    language="en", approval_status="waiting"
+                ).update(approval_status="approved")
+
+                # For each configured language, translate any content that hasn't
+                # been translated yet, then approve existing waiting translations.
+                # Note: TranslationConfig children may not have been committed
+                # yet if this save was triggered by a Wagtail admin form submission
+                # that also changed language configs. In that case,
+                # TranslationConfig.save() will handle the language catch-up
+                # independently once each child is committed.
+                for lang_config in TranslationConfig.objects.filter(config=self):
+                    language_display = dict(DocumentTranslation.LANGUAGE_CHOICES)[
+                        lang_config.language
+                    ]
+                    translation_approval_status = (
+                        "approved"
+                        if lang_config.auto_approve_translations
+                        else "waiting"
+                    )
+                    call_command(
+                        "batch_translate",
+                        language_display,
+                        approval_status=translation_approval_status,
+                    )
+                    if lang_config.auto_approve_translations:
+                        DocumentTranslation.objects.filter(
+                            language=lang_config.language,
+                            approval_status="waiting",
+                        ).update(approval_status="approved")
+                        call_command("convert_docs")
+        else:
+            super().save(*args, **kwargs)
+
+
+class TranslationConfig(Orderable):
+    """
+    Per-language configuration for translation approval.
+    Managed as an inline on ExtractionConfig.
+    """
+
+    NON_ENGLISH_LANGUAGE_CHOICES = [
+        choice for choice in DocumentTranslation.LANGUAGE_CHOICES if choice[0] != "en"
+    ]
+
+    config = ParentalKey(
+        ExtractionConfig,
+        on_delete=models.CASCADE,
+        related_name="language_configs",
+    )
+    language = models.CharField(choices=NON_ENGLISH_LANGUAGE_CHOICES)
+    auto_approve_translations = models.BooleanField(
+        default=True,
+        help_text=(
+            "Automatically approve machine translations in this language. "
+            "Translations marked as Needs Revision will not be auto-approved."
+        ),
+    )
+
+    class Meta(Orderable.Meta):
+        unique_together = [("config", "language")]
+
+    def __str__(self):
+        return (
+            f"{self.get_language_display()} translation auto-approve: "
+            f"{'on' if self.auto_approve_translations else 'off'}"
+        )
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            original = type(self).objects.get(pk=self.pk)
+            super().save(*args, **kwargs)
+
+            # When auto_approve_translations is turned on for this language, catch up:
+            # translate any content that hasn't been translated yet (approved from
+            # the start), then approve any translations that already exist but are
+            # waiting for review.
+            if (
+                not original.auto_approve_translations
+                and self.auto_approve_translations
+            ):
+                language_display = dict(DocumentTranslation.LANGUAGE_CHOICES)[
+                    self.language
+                ]
+                call_command(
+                    "batch_translate", language_display, approval_status="approved"
+                )
+                DocumentTranslation.objects.filter(
+                    language=self.language,
+                    approval_status="waiting",
+                ).update(approval_status="approved")
+                call_command("convert_docs")
+        else:
+            super().save(*args, **kwargs)
