@@ -460,7 +460,7 @@ class TranslationFile(models.Model):
         if self.format == "pdf" and self.document_translation.language == "en":
             return self.document_translation.document_content.document.source_url
 
-        return self.file
+        return self.file.url
 
 
 class ExtractionConfig(BaseGenericSetting, ClusterableModel):
