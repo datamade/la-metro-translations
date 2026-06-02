@@ -50,11 +50,11 @@ class Command(BaseCommand):
             logger.info("All Documents have up to date content! Not performing OCR.")
         else:
             logger.info(f"Performing OCR on {len(documents)} Document(s)...")
-            self.run_extraction(documents, extraction_config)
+            self.run_extractions(documents, extraction_config)
 
         self.chain_translations(extraction_config)
 
-    def run_extraction(self, documents, extraction_config):
+    def run_extractions(self, documents, extraction_config):
         extractions = list(MistralOCRService.metered_batch_extract(documents))
         now = datetime.now()
         extraction_status = (
@@ -137,7 +137,7 @@ class Command(BaseCommand):
         )
         logger.info("--- Finished! ---")
 
-    def chain_translation(self, extraction_config):
+    def chain_translations(self, extraction_config):
         if extraction_config.auto_approve_extractions:
             for translation_config in TranslationConfig.objects.filter(
                 config=extraction_config
