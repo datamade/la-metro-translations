@@ -255,6 +255,9 @@ class MistralOCRService:
                 res = requests.head(doc.source_url, timeout=10)
                 res.raise_for_status()
                 curr_batch_size += int(res.headers.get("Content-Length", 0))
+            except requests.exceptions.HTTPError as e:
+                logger.warning(f"HTTPERROR: {e} - Excluding from current batch.")
+                continue
             except Exception as e:
                 logger.warning(
                     f"Could not determine file size for {doc.source_url}: {e}. "
