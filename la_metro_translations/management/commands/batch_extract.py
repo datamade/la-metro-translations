@@ -92,7 +92,7 @@ class Command(BaseCommand):
             english_translations_to_upsert.append(
                 DocumentTranslation(
                     document_content=content,
-                    language="en",
+                    language="eng",
                     markdown=content.markdown,
                     approval_status=extraction_status,
                     updated_at=now,

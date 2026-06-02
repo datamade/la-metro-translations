@@ -200,7 +200,7 @@ class DocumentContent(AdminDisplayMixin, models.Model):
             super().save(*args, **kwargs)
 
             # Sync English translation content and status with document content & status
-            english_translation = self.translations.filter(language="en")
+            english_translation = self.translations.filter(language="eng")
 
             if english_translation.exists():
                 english_translation.update(
@@ -209,7 +209,7 @@ class DocumentContent(AdminDisplayMixin, models.Model):
 
             # If document content needs revision, so do translations
             if self.approval_status == "revision":
-                self.translations.exclude(language="en").update(
+                self.translations.exclude(language="eng").update(
                     approval_status="revision"
                 )
 
@@ -228,7 +228,7 @@ class DocumentContent(AdminDisplayMixin, models.Model):
                         language_code,
                         language_display,
                     ) in DocumentTranslation.LANGUAGE_CHOICES:
-                        if language_code == "en":
+                        if language_code == "eng":
                             continue
 
                         lang_config = config.language_configs.filter(
@@ -270,9 +270,18 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
         ]
         ordering = ["-updated_at"]
 
+    # Language codes based on ISO 639-3 standards
     LANGUAGE_CHOICES = [
-        ("en", "English"),
-        ("sp", "Spanish"),
+        ("hye", "Armenian (Eastern)"),
+        ("hyw", "Armenian (Western)"),
+        ("zho-cn", "Chinese (Simplified)"),
+        ("zho-tw", "Chinese (Traditional)"),
+        ("eng", "English"),
+        ("jpn", "Japanese"),
+        ("kor", "Korean"),
+        ("rus", "Russian"),
+        ("spa", "Spanish"),
+        ("vie", "Vietnamese"),
     ]
     APPROVAL_STATUS_CHOICES = [
         ("approved", "Approved for Publishing"),
@@ -327,7 +336,7 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
 
     def edit_link_display(self):
         if self.document_content.approval_status == "approved":
-            if self.language == "en":
+            if self.language == "eng":
                 edit_url = reverse(
                     f"{camel_to_snake(DocumentContent._meta.object_name)}:edit",
                     args=[self.document_content.pk],
@@ -412,7 +421,7 @@ class TranslationFile(models.Model):
         super().delete()
 
     def get_file(self):
-        if self.format == "pdf" and self.document_translation.language == "en":
+        if self.format == "pdf" and self.document_translation.language == "eng":
             return self.document_translation.document_content.document.source_url
 
         return self.file
@@ -461,7 +470,7 @@ class ExtractionConfig(BaseGenericSetting, ClusterableModel):
                     approval_status="approved"
                 )
                 DocumentTranslation.objects.filter(
-                    language="en", approval_status="waiting"
+                    language="eng", approval_status="waiting"
                 ).update(approval_status="approved")
 
                 # For each configured language, translate any content that hasn't
@@ -502,7 +511,7 @@ class TranslationConfig(Orderable):
     """
 
     NON_ENGLISH_LANGUAGE_CHOICES = [
-        choice for choice in DocumentTranslation.LANGUAGE_CHOICES if choice[0] != "en"
+        choice for choice in DocumentTranslation.LANGUAGE_CHOICES if choice[0] != "eng"
     ]
 
     config = ParentalKey(

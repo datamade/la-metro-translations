@@ -57,7 +57,7 @@ class TestBatchTranslateCommand:
             )
 
         translation = DocumentTranslation.objects.get(
-            document_content=document_content, language="sp"
+            document_content=document_content, language="spa"
         )
         assert translation.approval_status == approval_status
 
@@ -92,7 +92,7 @@ class TestBatchTranslateCommand:
     ):
         DocumentTranslationFactory(
             document_content=document_content,
-            language="sp",
+            language="spa",
             approval_status="approved",
         )
 
@@ -104,7 +104,7 @@ class TestBatchTranslateCommand:
         )
 
         translation = DocumentTranslation.objects.get(
-            document_content=document_content, language="sp"
+            document_content=document_content, language="spa"
         )
         assert translation.approval_status == "waiting"
 
@@ -162,7 +162,7 @@ class TestBatchExtractCommand:
         assert content.approval_status == expected_status
 
         en_translation = DocumentTranslation.objects.get(
-            document_content=content, language="en"
+            document_content=content, language="eng"
         )
         assert en_translation.approval_status == expected_status
 
@@ -178,7 +178,7 @@ class TestBatchExtractCommand:
         mock_ocr.return_value = extraction_result
         config = ExtractionConfigFactory(auto_approve_extractions=True)
         TranslationConfigFactory(
-            config=config, language="sp", auto_approve_translations=True
+            config=config, language="spa", auto_approve_translations=True
         )
 
         run_command("batch_extract")

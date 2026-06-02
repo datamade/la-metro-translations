@@ -271,7 +271,7 @@ class DocumentTranslationIndexView(IndexView):
             super()
             .get_base_queryset()
             .filter(document_content__approval_status="approved")
-            .exclude(language="en")
+            .exclude(language="eng")
         )
 
 

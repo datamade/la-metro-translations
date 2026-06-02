@@ -107,7 +107,7 @@ class Command(BaseCommand):
         for content in (c1, c2):
             te = DocumentTranslation.objects.create(
                 document_content=content,
-                language="en",
+                language="eng",
                 markdown=f"# {content.document.title} (EN)\n\nTranslated EN",
             )
             self.stdout.write(
@@ -115,7 +115,7 @@ class Command(BaseCommand):
             )
             ts = DocumentTranslation.objects.create(
                 document_content=content,
-                language="sp",
+                language="spa",
                 markdown=f"# {content.document.title} (ES)\n\nTraducido ES",
             )
             self.stdout.write(

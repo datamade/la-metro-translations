@@ -38,7 +38,7 @@ class DocumentTranslationFactory(factory.django.DjangoModelFactory):
         model = "la_metro_translations.DocumentTranslation"
 
     markdown = "Jugar querer montaña quince, otro gris más"
-    language = "sp"
+    language = "spa"
     approval_status = "waiting"
 
 
@@ -54,7 +54,7 @@ class TranslationConfigFactory(factory.django.DjangoModelFactory):
         model = "la_metro_translations.TranslationConfig"
 
     config = factory.SubFactory(ExtractionConfigFactory)
-    language = "sp"
+    language = "spa"
     auto_approve_translations = True
 
 

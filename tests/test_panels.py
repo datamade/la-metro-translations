@@ -82,7 +82,7 @@ class TestRelatedObjectsPanel:
         """Test rendering with complex query path (document_content__document)."""
         document = document_translation.document_content.document
         DocumentTranslationFactory(
-            language="english", document_content=document_translation.document_content
+            language="eng", document_content=document_translation.document_content
         )
 
         panel = RelatedObjectsPanel(
