@@ -98,7 +98,14 @@ class TestDocumentContentSave:
         content.approval_status = "approved"
         content.save()
 
-        assert mock_call_command.call_args.kwargs["approval_status"] == expected_status
+        # Check out this specific call
+        spanish_call = next(
+            c
+            for c in mock_call_command.call_args_list
+            if c.args[0] == "batch_translate" and c.args[1] == "Spanish"
+        )
+
+        assert spanish_call.kwargs["approval_status"] == expected_status
 
     @patch(PATCH_CALL_COMMAND)
     def test_translation_approval_status_defaults_to_waiting_without_language_config(
