@@ -65,6 +65,10 @@ class BatchUtils:
         """
         start_time = time.time()
         minutes_elapsed = 0
+
+        # Give the service a moment to create the job before checking
+        logger.info("Creating batch job...")
+        time.sleep(5)
         retrieved_job = client.batch.jobs.get(job_id=job_id)
 
         logger.info(
