@@ -52,9 +52,9 @@ class Command(BaseCommand):
             logger.info(f"Performing OCR on {len(documents)} Document(s)...")
             self.run_extraction(documents, extraction_config)
 
-        self.chain_translation(extraction_config)
+        self.chain_translations(extraction_config)
 
-    def run_extractions(self, documents, extraction_config):
+    def run_extraction(self, documents, extraction_config):
         extractions = list(MistralOCRService.metered_batch_extract(documents))
         now = datetime.now()
         extraction_status = (
