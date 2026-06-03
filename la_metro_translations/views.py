@@ -1,6 +1,20 @@
 import os
-
+from django.conf import settings
 from django.shortcuts import render
+from django.views.generic import TemplateView
+
+
+class PromptView(TemplateView):
+    template_name = "la_metro_translations/prompt.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        file_path = os.path.join(
+            settings.BASE_DIR, "la_metro_translations", "prompt.txt"
+        )
+        with open(file_path) as f:
+            context["prompt_text"] = f.read()
+        return context
 
 
 def robots_txt(request):
