@@ -35,6 +35,12 @@ Since hooks are run locally, you can modify which scripts are run before each co
 
 ### Usage
 
+#### Create .env file
+
+```bash
+cp .env.example .env
+```
+
 #### Running the app
 
 ```bash
