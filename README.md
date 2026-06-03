@@ -71,7 +71,7 @@ command.
 You will need to create a default user in order to access the CMS:
 
 ```bash
-python manage.py createsuperuser
+docker compose run --rm app python manage.py createsuperuser
 ```
 
 To dump your local database to a fixture and copy any files you've uploaded locally, run:
