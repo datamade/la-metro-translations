@@ -204,7 +204,16 @@ class DocumentContentViewSet(ModelViewSet):
                         FieldPanel("updated_at", read_only=True),
                     ]
                 ),
-                FieldPanel("approval_status"),
+                FieldRowPanel(
+                    [
+                        FieldPanel("approval_status"),
+                        PropertyPanel(
+                            "file_formats_display",
+                            heading="File Formats",
+                            attrs={"style": "width: stretch;"},
+                        ),
+                    ]
+                ),
                 FieldPanel("markdown"),
             ],
             heading="Document Content",
@@ -354,7 +363,16 @@ class DocumentTranslationViewSet(ModelViewSet):
                         FieldPanel("updated_at", read_only=True),
                     ]
                 ),
-                FieldPanel("approval_status"),
+                FieldRowPanel(
+                    [
+                        FieldPanel("approval_status"),
+                        PropertyPanel(
+                            "file_formats_display",
+                            heading="File Formats",
+                            attrs={"style": "width: stretch;"},
+                        ),
+                    ]
+                ),
                 FieldPanel("markdown"),
             ],
             heading="Document Translation",

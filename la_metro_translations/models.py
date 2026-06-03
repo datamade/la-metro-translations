@@ -255,6 +255,30 @@ class DocumentContent(AdminDisplayMixin, models.Model):
 
     document_title.short_description = "Title"
 
+    def file_formats_display(self):
+        files_btn_fragment = (
+            "<a class='button'"
+            "style='width: stretch; font-weight: bold; text-align: center;'"
+            "target='_blank' href='{}'>{}</a>"
+        )
+        files_btns = files_btn_fragment.format(self.document.source_url, "Original PDF")
+
+        try:
+            rtf = self.translations.get(language="en").files.get(format="rtf")
+        except (DocumentTranslation.DoesNotExist, TranslationFile.DoesNotExist):
+            pass
+        else:
+            files_btns += files_btn_fragment.format(
+                rtf.get_file_url(), rtf.format.upper()
+            )
+
+        return format_html(
+            "<div style='display: flex; justify-content: space-between'>{}</div>",
+            mark_safe(files_btns),
+        )
+
+    file_formats_display.short_description = "File Formats"
+
 
 class DocumentTranslation(AdminDisplayMixin, models.Model):
     """
@@ -355,6 +379,27 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
 
     language_display.short_description = "Language"
 
+    def file_formats_display(self):
+        if getattr(self, "files", False):
+            files_btns = ""
+            for f in self.files.all():
+                files_btns += (
+                    "<a class='button'"
+                    "style='width: stretch; font-weight: bold; text-align: center;'"
+                    f"target='_blank' href='{f.get_file_url()}'>{f.format.upper()}</a>"
+                )
+
+            return format_html(
+                "<div style='display: flex; justify-content: space-between'>{}</div>",
+                mark_safe(files_btns),
+            )
+
+        return mark_safe(
+            "<p>This translation is not yet available in other file formats.</p>"
+        )
+
+    file_formats_display.short_description = "File Formats"
+
 
 def translation_file_path(instance, filename):
     year = instance.document_translation.document_content.document.created_at.year
@@ -411,11 +456,11 @@ class TranslationFile(models.Model):
         self.file.delete(save=False)
         super().delete()
 
-    def get_file(self):
+    def get_file_url(self):
         if self.format == "pdf" and self.document_translation.language == "en":
             return self.document_translation.document_content.document.source_url
 
-        return self.file
+        return self.file.url
 
 
 class ExtractionConfig(BaseGenericSetting, ClusterableModel):
