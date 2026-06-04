@@ -25,7 +25,7 @@ class TestDocumentContentSave:
         """Approved content with an English translation already present."""
         content = DocumentContentFactory(document=document, approval_status="approved")
         DocumentTranslationFactory(
-            document_content=content, language="en", approval_status="approved"
+            document_content=content, language="eng", approval_status="approved"
         )
         return content
 
@@ -52,7 +52,7 @@ class TestDocumentContentSave:
             document=document, approval_status=initial_status, markdown=initial_markdown
         )
         DocumentTranslationFactory(
-            document_content=content, language="en", approval_status=initial_status
+            document_content=content, language="eng", approval_status=initial_status
         )
 
         content.approval_status = new_status
@@ -86,19 +86,26 @@ class TestDocumentContentSave:
     ):
         config = ExtractionConfigFactory()
         TranslationConfigFactory(
-            config=config, language="sp", auto_approve_translations=auto_approve
+            config=config, language="spa", auto_approve_translations=auto_approve
         )
         content = DocumentContentFactory(
             document=document, approval_status="waiting", markdown="original"
         )
         DocumentTranslationFactory(
-            document_content=content, language="en", approval_status="waiting"
+            document_content=content, language="eng", approval_status="waiting"
         )
 
         content.approval_status = "approved"
         content.save()
 
-        assert mock_call_command.call_args.kwargs["approval_status"] == expected_status
+        # Check out this specific call
+        spanish_call = next(
+            c
+            for c in mock_call_command.call_args_list
+            if c.args[0] == "batch_translate" and c.args[1] == "Spanish"
+        )
+
+        assert spanish_call.kwargs["approval_status"] == expected_status
 
     @patch(PATCH_CALL_COMMAND)
     def test_translation_approval_status_defaults_to_waiting_without_language_config(
@@ -109,7 +116,7 @@ class TestDocumentContentSave:
             document=document, approval_status="waiting", markdown="original"
         )
         DocumentTranslationFactory(
-            document_content=content, language="en", approval_status="waiting"
+            document_content=content, language="eng", approval_status="waiting"
         )
 
         content.approval_status = "approved"
@@ -123,7 +130,7 @@ class TestDocumentContentSave:
     ):
         spanish = DocumentTranslationFactory(
             document_content=content_with_english,
-            language="sp",
+            language="spa",
             approval_status="approved",
         )
 
@@ -147,7 +154,7 @@ class TestDocumentContentSave:
         content_with_english.markdown = "updated markdown"
         content_with_english.save()
 
-        english = content_with_english.translations.get(language="en")
+        english = content_with_english.translations.get(language="eng")
         assert english.markdown == "updated markdown"
 
 
@@ -202,7 +209,7 @@ class TestExtractionConfigSave:
     ):
         config = ExtractionConfigFactory(auto_approve_extractions=False)
         TranslationConfigFactory(
-            config=config, language="sp", auto_approve_translations=True
+            config=config, language="spa", auto_approve_translations=True
         )
 
         config.auto_approve_extractions = True
@@ -226,19 +233,19 @@ class TestTranslationConfigSave:
         self, mock_call_command, extraction_config
     ):
         lang_config = TranslationConfigFactory(
-            config=extraction_config, language="sp", auto_approve_translations=False
+            config=extraction_config, language="spa", auto_approve_translations=False
         )
 
         doc_a = DocumentFactory(document_id="doc-a")
         content_a = DocumentContentFactory(document=doc_a, approval_status="approved")
         waiting = DocumentTranslationFactory(
-            document_content=content_a, language="sp", approval_status="waiting"
+            document_content=content_a, language="spa", approval_status="waiting"
         )
 
         doc_b = DocumentFactory(document_id="doc-b")
         content_b = DocumentContentFactory(document=doc_b, approval_status="approved")
         revision = DocumentTranslationFactory(
-            document_content=content_b, language="sp", approval_status="revision"
+            document_content=content_b, language="spa", approval_status="revision"
         )
 
         lang_config.auto_approve_translations = True
@@ -261,10 +268,10 @@ class TestTranslationConfigSave:
         self, mock_call_command, extraction_config, document_content
     ):
         lang_config = TranslationConfigFactory(
-            config=extraction_config, language="sp", auto_approve_translations=True
+            config=extraction_config, language="spa", auto_approve_translations=True
         )
         waiting = DocumentTranslationFactory(
-            document_content=document_content, language="sp", approval_status="waiting"
+            document_content=document_content, language="spa", approval_status="waiting"
         )
 
         lang_config.save()  # no change to auto_approve_translations

@@ -65,7 +65,7 @@ class Command(BaseCommand):
         supported_languages = [
             choice
             for choice in DocumentTranslation.LANGUAGE_CHOICES
-            if choice[0] != "en"
+            if choice[0] != "eng"
         ]
 
         user_language = options["language"].title()

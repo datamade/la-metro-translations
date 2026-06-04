@@ -22,12 +22,16 @@ logger = logging.getLogger(__name__)
 class Command(BaseCommand):
     """
     Extract text from documents that need content, and create/update related objects.
+    If auto-approvals are enabled for extractions, chains into batch_translate
+    upon completion.
     """
 
     help = (
         "Perform OCR text extraction on all Documents that either do not have a "
         "related DocumentContent object or have been updated more recently than their "
-        "DocumentContent, then upsert english DocumentTranslation and TranslationFiles."
+        "DocumentContent, then upsert english DocumentTranslation and "
+        "TranslationFiles. If auto-approvals are enabled for extractions, then this "
+        "chains into batch_translate upon completion. "
     )
 
     def reset_db_connections(self):
@@ -40,15 +44,19 @@ class Command(BaseCommand):
         documents = Document.objects.filter(
             Q(content__isnull=True) | Q(content__updated_at__lt=F("updated_at"))
         ).distinct()
+        extraction_config = ExtractionConfig.load()
+
         if len(documents) == 0:
             logger.info("All Documents have up to date content! Not performing OCR.")
-            return
         else:
             logger.info(f"Performing OCR on {len(documents)} Document(s)...")
+            self.run_extractions(documents, extraction_config)
 
+        self.chain_translations(extraction_config)
+
+    def run_extractions(self, documents, extraction_config):
         extractions = list(MistralOCRService.metered_batch_extract(documents))
         now = datetime.now()
-        extraction_config = ExtractionConfig.load()
         extraction_status = (
             "approved" if extraction_config.auto_approve_extractions else "waiting"
         )
@@ -92,7 +100,7 @@ class Command(BaseCommand):
             english_translations_to_upsert.append(
                 DocumentTranslation(
                     document_content=content,
-                    language="en",
+                    language="eng",
                     markdown=content.markdown,
                     approval_status=extraction_status,
                     updated_at=now,
@@ -127,7 +135,9 @@ class Command(BaseCommand):
             "Documents with updated related content objects: "
             f"{len(new_contents)} out of {len(documents)}"
         )
+        logger.info("--- Finished! ---")
 
+    def chain_translations(self, extraction_config):
         if extraction_config.auto_approve_extractions:
             for translation_config in TranslationConfig.objects.filter(
                 config=extraction_config
@@ -149,5 +159,3 @@ class Command(BaseCommand):
                     language_str,
                     approval_status=translation_approval_status,
                 )
-
-        logger.info("--- Finished! ---")

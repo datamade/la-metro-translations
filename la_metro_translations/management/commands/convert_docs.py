@@ -39,7 +39,7 @@ class Command(BaseCommand):
         doc = DocumentTranslation.objects.get(id=document_translation_id)
         converter = DocumentTranslationConverter(doc)
         files_to_create = [converter.convert_to_rtf()]
-        if doc.language != "en":
+        if doc.language != "eng":
             files_to_create.append(converter.convert_to_pdf())
         self.bulk_create_translation_files(files_to_create)
 
@@ -72,7 +72,7 @@ class Command(BaseCommand):
 
         for doc in DocumentTranslation.objects.exclude(
             pk__in=Subquery(up_to_date_pdfs.values("document_translation")),
-            language="en",
+            language="eng",
         ):
             try:
                 pdf_file = DocumentTranslationConverter(doc).convert_to_pdf()
