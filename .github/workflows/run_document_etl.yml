@@ -28,6 +28,7 @@ env:
   DATABASE_URL: ${{ secrets.DATABASE_URL }}
   DJANGO_DEBUG: $${ vars.DJANGO_DEBUG }}
   BOARDAGENDAS_URL: $${ vars.BOARDAGENDAS_URL }}
+  TRANSLATION_SERVICE: $${ vars.TRANSLATION_SERVICE }}
 
 jobs:
   extract:
