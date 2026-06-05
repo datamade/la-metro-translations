@@ -19,3 +19,4 @@ djangorestframework==3.16.1
 pypandoc==1.17
 weasyprint==68.1
 django-filter==24.3
+tqdm==4.68

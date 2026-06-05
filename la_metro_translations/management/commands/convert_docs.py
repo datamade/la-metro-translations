@@ -2,6 +2,7 @@ import logging
 from datetime import datetime
 from django.core.management.base import BaseCommand
 from django.db.models import OuterRef, Subquery
+from tqdm import tqdm
 
 from la_metro_translations.models import DocumentTranslation, TranslationFile
 from la_metro_translations.services import (
@@ -53,8 +54,11 @@ class Command(BaseCommand):
             document_translation=OuterRef("pk"),
         )
 
-        for doc in DocumentTranslation.objects.exclude(
-            pk__in=Subquery(up_to_date_rtfs.values("document_translation")),
+        logger.info("Checking for translations that need up to date RTFs...")
+        for doc in tqdm(
+            DocumentTranslation.objects.exclude(
+                pk__in=Subquery(up_to_date_rtfs.values("document_translation")),
+            )
         ):
             try:
                 rtf_file = DocumentTranslationConverter(doc).convert_to_rtf()
@@ -70,9 +74,12 @@ class Command(BaseCommand):
             document_translation=OuterRef("pk"),
         )
 
-        for doc in DocumentTranslation.objects.exclude(
-            pk__in=Subquery(up_to_date_pdfs.values("document_translation")),
-            language="eng",
+        logger.info("Checking for translations that need up to date PDFs...")
+        for doc in tqdm(
+            DocumentTranslation.objects.exclude(
+                pk__in=Subquery(up_to_date_pdfs.values("document_translation")),
+                language="eng",
+            )
         ):
             try:
                 pdf_file = DocumentTranslationConverter(doc).convert_to_pdf()
@@ -91,6 +98,7 @@ class Command(BaseCommand):
         for file in files_to_create:
             file.updated_at = datetime.now()
 
+        logger.info("Storing files...")
         TranslationFile.objects.bulk_create(
             files_to_create,
             update_conflicts=True,
