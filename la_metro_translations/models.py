@@ -1,7 +1,7 @@
 import re
 
 from django.conf import settings
-from la_metro_translations.services.backends import get_backend
+from la_metro_translations.backends import get_backend
 from django.db import models
 from django.urls import reverse
 from django.utils.html import format_html
