@@ -10,7 +10,7 @@ from conftest import (
 )
 from la_metro_translations.models import DocumentContent
 
-PATCH_CALL_COMMAND = "la_metro_translations.models.call_command"
+PATCH_GET_BACKEND = "la_metro_translations.models.get_backend"
 
 
 @pytest.mark.django_db
@@ -37,7 +37,7 @@ class TestDocumentContentSave:
         ],
         ids=["content_changed", "newly_approved"],
     )
-    @patch(PATCH_CALL_COMMAND)
+    @patch(PATCH_GET_BACKEND)
     def test_batch_translate_called_on_relevant_change(
         self,
         mock_call_command,
@@ -59,24 +59,24 @@ class TestDocumentContentSave:
         content.markdown = new_markdown
         content.save()
 
-        assert mock_call_command.called
-        assert mock_call_command.call_args[0][0] == "batch_translate"
+        assert mock_call_command().start_job.called
+        assert mock_call_command().start_job.call_args[0][0] == "batch_translate"
 
-    @patch(PATCH_CALL_COMMAND)
+    @patch(PATCH_GET_BACKEND)
     def test_batch_translate_not_called_when_no_change(
         self, mock_call_command, content_with_english
     ):
         ExtractionConfigFactory()
         content_with_english.save()
 
-        mock_call_command.assert_not_called()
+        mock_call_command().start_job.assert_not_called()
 
     @pytest.mark.parametrize(
         "auto_approve,expected_status",
         [(True, "approved"), (False, "waiting")],
         ids=["auto_approve_on", "auto_approve_off"],
     )
-    @patch(PATCH_CALL_COMMAND)
+    @patch(PATCH_GET_BACKEND)
     def test_translation_approval_status_from_language_config(
         self,
         mock_call_command,
@@ -101,13 +101,13 @@ class TestDocumentContentSave:
         # Check out this specific call
         spanish_call = next(
             c
-            for c in mock_call_command.call_args_list
+            for c in mock_call_command().start_job.call_args_list
             if c.args[0] == "batch_translate" and c.args[1] == "Spanish"
         )
 
         assert spanish_call.kwargs["approval_status"] == expected_status
 
-    @patch(PATCH_CALL_COMMAND)
+    @patch(PATCH_GET_BACKEND)
     def test_translation_approval_status_defaults_to_waiting_without_language_config(
         self, mock_call_command, document
     ):
@@ -122,9 +122,12 @@ class TestDocumentContentSave:
         content.approval_status = "approved"
         content.save()
 
-        assert mock_call_command.call_args.kwargs["approval_status"] == "waiting"
+        assert (
+            mock_call_command().start_job.call_args.kwargs["approval_status"]
+            == "waiting"
+        )
 
-    @patch(PATCH_CALL_COMMAND)
+    @patch(PATCH_GET_BACKEND)
     def test_revision_marks_translations_and_does_not_call_batch_translate(
         self, mock_call_command, content_with_english
     ):
@@ -137,16 +140,16 @@ class TestDocumentContentSave:
         content_with_english.approval_status = "revision"
         content_with_english.save()
 
-        mock_call_command.assert_not_called()
+        mock_call_command().start_job.assert_not_called()
         spanish.refresh_from_db()
         assert spanish.approval_status == "revision"
 
-    @patch(PATCH_CALL_COMMAND)
+    @patch(PATCH_GET_BACKEND)
     def test_new_object_does_not_trigger_translation(self, mock_call_command, document):
         DocumentContentFactory(document=document, approval_status="approved")
-        mock_call_command.assert_not_called()
+        mock_call_command().start_job.assert_not_called()
 
-    @patch(PATCH_CALL_COMMAND)
+    @patch(PATCH_GET_BACKEND)
     def test_english_translation_synced_on_content_change(
         self, mock_call_command, content_with_english
     ):
@@ -174,7 +177,7 @@ class TestExtractionConfigSave:
         ],
         ids=["waiting_gets_approved", "revision_unchanged"],
     )
-    @patch(PATCH_CALL_COMMAND)
+    @patch(PATCH_GET_BACKEND)
     def test_catch_up_content_status_on_flip(
         self, mock_call_command, initial_status, expected_after, document
     ):
@@ -189,7 +192,7 @@ class TestExtractionConfigSave:
             == expected_after
         )
 
-    @patch(PATCH_CALL_COMMAND)
+    @patch(PATCH_GET_BACKEND)
     def test_catch_up_does_not_run_when_already_auto_approved(
         self, mock_call_command, document
     ):
@@ -201,9 +204,9 @@ class TestExtractionConfigSave:
         assert (
             DocumentContent.objects.get(document=document).approval_status == "waiting"
         )
-        mock_call_command.assert_not_called()
+        mock_call_command().start_job.assert_not_called()
 
-    @patch(PATCH_CALL_COMMAND)
+    @patch(PATCH_GET_BACKEND)
     def test_catch_up_triggers_batch_translate_per_language_config(
         self, mock_call_command
     ):
@@ -215,7 +218,7 @@ class TestExtractionConfigSave:
         config.auto_approve_extractions = True
         config.save()
 
-        mock_call_command.assert_any_call(
+        mock_call_command().start_job.assert_any_call(
             "batch_translate", "Spanish", approval_status="approved"
         )
 
@@ -228,7 +231,7 @@ class TestTranslationConfigSave:
     auto_approve_translations is switched on for a language.
     """
 
-    @patch(PATCH_CALL_COMMAND)
+    @patch(PATCH_GET_BACKEND)
     def test_catch_up_on_flip_approves_waiting_not_revision(
         self, mock_call_command, extraction_config
     ):
@@ -252,10 +255,13 @@ class TestTranslationConfigSave:
         lang_config.save()
 
         # batch_translate and convert_docs should both be called
-        assert call("batch_translate", "Spanish", approval_status="approved") in (
-            mock_call_command.call_args_list
+        assert call().start_job(
+            "batch_translate", "Spanish", approval_status="approved"
+        ) in (mock_call_command().start_job.call_args_list)
+        assert (
+            call().start_job("convert_docs")
+            in mock_call_command().start_job.call_args_list
         )
-        assert call("convert_docs") in mock_call_command.call_args_list
 
         # waiting translation approved; revision left alone
         waiting.refresh_from_db()
@@ -263,7 +269,7 @@ class TestTranslationConfigSave:
         revision.refresh_from_db()
         assert revision.approval_status == "revision"
 
-    @patch(PATCH_CALL_COMMAND)
+    @patch(PATCH_GET_BACKEND)
     def test_catch_up_does_not_run_when_already_auto_approved(
         self, mock_call_command, extraction_config, document_content
     ):
@@ -278,4 +284,4 @@ class TestTranslationConfigSave:
 
         waiting.refresh_from_db()
         assert waiting.approval_status == "waiting"
-        mock_call_command.assert_not_called()
+        mock_call_command().start_job.assert_not_called()
