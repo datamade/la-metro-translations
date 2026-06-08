@@ -49,5 +49,6 @@ def get_backend():
     return (
         HerokuBackend()
         if getattr(settings, "HEROKU_APP_NAME", None)
+        and getattr(settings, "HEROKU_API_TOKEN", None)
         else LocalBackend()
     )
