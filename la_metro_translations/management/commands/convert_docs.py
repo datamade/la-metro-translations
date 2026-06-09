@@ -60,6 +60,7 @@ class Command(BaseCommand):
                 pk__in=Subquery(up_to_date_rtfs.values("document_translation")),
             )
         ):
+            self.meter_files_in_memory(files_to_create)
             try:
                 rtf_file = DocumentTranslationConverter(doc).convert_to_rtf()
             except DocumentTranslationConverterError as e:
@@ -81,6 +82,7 @@ class Command(BaseCommand):
                 language="eng",
             )
         ):
+            self.meter_files_in_memory(files_to_create)
             try:
                 pdf_file = DocumentTranslationConverter(doc).convert_to_pdf()
             except DocumentTranslationConverterError as e:
@@ -93,6 +95,8 @@ class Command(BaseCommand):
             return
 
         self.bulk_create_translation_files(files_to_create)
+
+        logger.info("--- Finished! ---")
 
     def bulk_create_translation_files(self, files_to_create):
         for file in files_to_create:
@@ -109,4 +113,12 @@ class Command(BaseCommand):
         logger.info(
             f"Created a total of {len(files_to_create)} up to date rtfs and pdfs"
         )
-        logger.info("--- Finished! ---")
+
+    def meter_files_in_memory(self, files_to_create, bulk_limit=1000):
+        """
+        Create files and empty the queue if we've exceeded a reasonable amount
+        of files in memory. Prevents Heroku "memory quota vastly exceeded" errors.
+        """
+        if len(files_to_create) > bulk_limit:
+            self.bulk_create_translation_files(files_to_create)
+            del files_to_create[:]
