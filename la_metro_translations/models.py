@@ -1,7 +1,7 @@
 import re
 
 from django.conf import settings
-from django.core.management import call_command
+from la_metro_translations.backends import get_backend
 from django.db import models
 from django.urls import reverse
 from django.utils.html import format_html
@@ -223,7 +223,6 @@ class DocumentContent(AdminDisplayMixin, models.Model):
                 if content_changed or content_approved:
                     config = ExtractionConfig.load()
 
-                    # TODO: Probably want to do this asynchronously
                     for (
                         language_code,
                         language_display,
@@ -240,7 +239,7 @@ class DocumentContent(AdminDisplayMixin, models.Model):
                             else "waiting"
                         )
 
-                        call_command(
+                        get_backend().start_job(
                             "batch_translate",
                             language_display,
                             document_content=self.id,
@@ -347,7 +346,9 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
                 content_approved = original_obj.approval_status != "approved"
 
                 if content_changed or content_approved:
-                    call_command("convert_docs", document_translation=self.id)
+                    get_backend().start_job(
+                        "convert_docs", document_translation=self.id
+                    )
 
         else:
             return super().save(*args, **kwargs)
@@ -534,7 +535,7 @@ class ExtractionConfig(BaseGenericSetting, ClusterableModel):
                         if lang_config.auto_approve_translations
                         else "waiting"
                     )
-                    call_command(
+                    get_backend().start_job(
                         "batch_translate",
                         language_display,
                         approval_status=translation_approval_status,
@@ -544,7 +545,7 @@ class ExtractionConfig(BaseGenericSetting, ClusterableModel):
                             language=lang_config.language,
                             approval_status="waiting",
                         ).update(approval_status="approved")
-                        call_command("convert_docs")
+                        get_backend().start_job("convert_docs")
         else:
             super().save(*args, **kwargs)
 
@@ -598,13 +599,13 @@ class TranslationConfig(Orderable):
                 language_display = dict(DocumentTranslation.LANGUAGE_CHOICES)[
                     self.language
                 ]
-                call_command(
+                get_backend().start_job(
                     "batch_translate", language_display, approval_status="approved"
                 )
                 DocumentTranslation.objects.filter(
                     language=self.language,
                     approval_status="waiting",
                 ).update(approval_status="approved")
-                call_command("convert_docs")
+                get_backend().start_job("convert_docs")
         else:
             super().save(*args, **kwargs)
