@@ -1,4 +1,5 @@
 import io
+import os
 import pypandoc
 
 from weasyprint import HTML
@@ -20,6 +21,10 @@ class DocumentTranslationConverter:
             )
 
         self.doc_translation = doc_translation
+        self.doc_css_path = (
+            os.path.dirname(os.path.abspath(__file__))
+            + "/../static/css/converted_docs.css"
+        )
 
     def convert_to_pdf(self) -> TranslationFile:
         md_text = self.doc_translation.markdown or ""
@@ -28,8 +33,12 @@ class DocumentTranslationConverter:
             # Pypandoc requires PDFs to be written to the filesystem so
             # we can first convert the markdown to HTML and then use
             # weasyprint to convert the HTML to PDF in memory
-            html = pypandoc.convert_text(md_text, to="html", format="md")
-            pdf_bytes = HTML(string=html, base_url=".").write_pdf()
+            html = pypandoc.convert_text(
+                md_text, to="html", format="markdown-yaml_metadata_block"
+            )
+            pdf_bytes = HTML(string=html, base_url=".").write_pdf(
+                stylesheets=[self.doc_css_path]
+            )
         except Exception as e:
             raise DocumentTranslationConverterError(f"Conversion failed: {e}")
 
@@ -57,7 +66,9 @@ class DocumentTranslationConverter:
         md_text = self.doc_translation.markdown or ""
 
         try:
-            output = pypandoc.convert_text(md_text, to="rtf", format="md")
+            output = pypandoc.convert_text(
+                md_text, to="rtf", format="markdown-yaml_metadata_block"
+            )
             out_bytes = (
                 output
                 if isinstance(output, (bytes, bytearray))
