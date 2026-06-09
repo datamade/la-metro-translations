@@ -1,4 +1,5 @@
 from wagtail import hooks
+from wagtail.admin.menu import MenuItem
 from wagtail.admin.panels import FieldPanel, MultiFieldPanel, FieldRowPanel
 from wagtail.admin.viewsets.model import ModelViewSet
 from wagtail.admin.filters import WagtailFilterSet
@@ -7,11 +8,11 @@ from wagtail.permissions import ModelPermissionPolicy
 from wagtail.snippets.views.snippets import IndexView
 
 from django_filters import CharFilter, ChoiceFilter
+from django.urls import path, reverse
+from .views import PromptView
 
 from .models import Document, DocumentContent, DocumentTranslation, ExtractionConfig
 from .panels import PropertyPanel, RelatedObjectsPanel
-
-register_setting(ExtractionConfig, icon="cog")
 
 
 class ReadEditOnlyPermissionPolicy(ModelPermissionPolicy):
@@ -395,6 +396,23 @@ def register_document_translation_viewset():
     return DocumentTranslationViewSet("document_translation")
 
 
+@hooks.register("register_admin_urls")
+def register_prompt_url():
+    return [
+        path("prompt/", PromptView.as_view(), name="prompt"),
+    ]
+
+
+# Custom settings items, put at top of list (order before 100)
+register_setting(ExtractionConfig, icon="cog", order=50)
+
+
+@hooks.register("register_settings_menu_item")
+def register_prompt_menu_item():
+    return MenuItem("Prompt", reverse("prompt"), icon_name="openquote", order=51)
+
+
+# Only show selected elements in main menu
 @hooks.register("construct_main_menu")
 def hide_all_but_modeladmin_and_settings(request, menu_items):
     signatures = (
