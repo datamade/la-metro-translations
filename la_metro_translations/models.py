@@ -446,7 +446,9 @@ class TranslationFile(models.Model):
     ]
 
     format = models.CharField(choices=FORMAT_CHOICES)
-    file = models.FileField(upload_to=translation_file_path, blank=True, null=True)
+    file = models.FileField(
+        upload_to=translation_file_path, blank=True, null=True, max_length=255
+    )
     document_translation = models.ForeignKey(
         DocumentTranslation, on_delete=models.CASCADE, related_name="files"
     )
