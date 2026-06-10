@@ -46,7 +46,7 @@ class Command(BaseCommand):
 
     def convert_docs(self):
         files_to_create = []
-        chunk_size = 1000
+        chunk_size = 500
 
         # Create RTFs
         up_to_date_rtfs = TranslationFile.objects.filter(
@@ -109,9 +109,7 @@ class Command(BaseCommand):
             update_fields=["file", "updated_at"],
         )
 
-        logger.info(
-            f"Created a total of {len(files_to_create)} up to date rtfs and pdfs"
-        )
+        logger.info(f"Created a total of {len(files_to_create)} up to date files")
 
     def meter_files_in_memory(self, files_to_create, chunk_size):
         """
