@@ -46,6 +46,7 @@ class Command(BaseCommand):
 
     def convert_docs(self):
         files_to_create = []
+        chunk_size = 1000
 
         # Create RTFs
         up_to_date_rtfs = TranslationFile.objects.filter(
@@ -55,12 +56,11 @@ class Command(BaseCommand):
         )
 
         logger.info("Checking for translations that need up to date RTFs...")
-        for doc in tqdm(
-            DocumentTranslation.objects.exclude(
-                pk__in=Subquery(up_to_date_rtfs.values("document_translation")),
-            )
-        ):
-            self.meter_files_in_memory(files_to_create)
+        rtf_qs = DocumentTranslation.objects.exclude(
+            pk__in=Subquery(up_to_date_rtfs.values("document_translation")),
+        ).select_related("document_content__document")
+        for doc in tqdm(rtf_qs.iterator(chunk_size=chunk_size), total=rtf_qs.count()):
+            self.meter_files_in_memory(files_to_create, chunk_size)
             try:
                 rtf_file = DocumentTranslationConverter(doc).convert_to_rtf()
             except DocumentTranslationConverterError as e:
@@ -76,13 +76,12 @@ class Command(BaseCommand):
         )
 
         logger.info("Checking for translations that need up to date PDFs...")
-        for doc in tqdm(
-            DocumentTranslation.objects.exclude(
-                pk__in=Subquery(up_to_date_pdfs.values("document_translation")),
-                language="eng",
-            )
-        ):
-            self.meter_files_in_memory(files_to_create)
+        pdf_qs = DocumentTranslation.objects.exclude(
+            pk__in=Subquery(up_to_date_pdfs.values("document_translation")),
+            language="eng",
+        ).select_related("document_content__document")
+        for doc in tqdm(pdf_qs.iterator(chunk_size=chunk_size), total=pdf_qs.count()):
+            self.meter_files_in_memory(files_to_create, chunk_size)
             try:
                 pdf_file = DocumentTranslationConverter(doc).convert_to_pdf()
             except DocumentTranslationConverterError as e:
@@ -114,11 +113,11 @@ class Command(BaseCommand):
             f"Created a total of {len(files_to_create)} up to date rtfs and pdfs"
         )
 
-    def meter_files_in_memory(self, files_to_create, bulk_limit=1000):
+    def meter_files_in_memory(self, files_to_create, chunk_size):
         """
         Create files and empty the queue if we've exceeded a reasonable amount
         of files in memory. Prevents Heroku "memory quota vastly exceeded" errors.
         """
-        if len(files_to_create) > bulk_limit:
+        if len(files_to_create) >= chunk_size:
             self.bulk_create_translation_files(files_to_create)
             del files_to_create[:]
