@@ -55,7 +55,7 @@ class DocumentFilesView(APIView):
     def get(self, request):
         api_key = request.query_params.get("api_key")
         entity_type = request.query_params.get("entity_type")
-        entity_id = request.query_params.get("entity_id")
+        document_id = request.query_params.get("document_id")
         link_text_map = {
             "hye": "Օրակարգը ներբեռնել (Արևելահայերեն)",
             "hyw": "Ներբեռնել Օրակարգը (Արևմտահայերէն)",
@@ -76,7 +76,7 @@ class DocumentFilesView(APIView):
         try:
             content = DocumentContent.objects.prefetch_related(
                 "translations", "translations__files"
-            ).get(document__entity_type=entity_type, document__entity_id=entity_id)
+            ).get(document__entity_type=entity_type, document__document_id=document_id)
         except DocumentContent.DoesNotExist:
             error_msg = "Not Found: Matching document does not exist in the suite."
             return Response(error_msg, status=status.HTTP_404_NOT_FOUND)
