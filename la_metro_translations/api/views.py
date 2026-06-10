@@ -1,8 +1,9 @@
+from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
-from la_metro_translations.models import Document
+from la_metro_translations.models import Document, DocumentContent
 from la_metro_translations.api.serializers import NotificationSerializer
 
 
@@ -44,3 +45,52 @@ class DocumentUpdateView(APIView):
             "message": f"Success: Document(s) created/updated - {len(created_docs)}"
         }
         return Response(success_msg, status=status.HTTP_201_CREATED)
+
+
+class DocumentFilesView(APIView):
+    """
+    Return urls for an entity's files and translations.
+    """
+
+    def get(self, request):
+        api_key = request.query_params.get("api_key")
+        entity_type = request.query_params.get("entity_type")
+        entity_id = request.query_params.get("entity_id")
+        link_text_map = {
+            "hye": "Օրակարգը ներբեռնել (Արևելահայերեն)",
+            "hyw": "Ներբեռնել Օրակարգը (Արևմտահայերէն)",
+            "zho-cn": "下载议程 (汉语)",
+            "zho-tw": "下載議程 (漢語)",
+            "eng": "Download Agenda (English)",
+            "jpn": "議事日程のダウンロード (日本語)",
+            "kor": "의제 다운로드 (한국어)",
+            "rus": "Скачать повестку дня (Русский)",
+            "spa": "Descargar Agenda (Español)",
+            "vie": "Tải xuống Chương trình (tiếng Việt)",
+        }
+
+        if api_key != settings.BOARDAGENDAS_API_KEY:
+            error_msg = "Unauthorized: Invalid api key. Double check the key submitted."
+            return Response(error_msg, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            content = DocumentContent.objects.prefetch_related(
+                "translations", "translations__files"
+            ).get(document__entity_type=entity_type, document__entity_id=entity_id)
+        except DocumentContent.DoesNotExist:
+            error_msg = "Not Found: Matching document does not exist in the suite."
+            return Response(error_msg, status=status.HTTP_404_NOT_FOUND)
+
+        file_links = {"pdf": [], "rtf": []}
+        for translation in content.translations.all():
+            for file in translation.files.all():
+                if translation.language == "eng" and file.format == "pdf":
+                    continue
+                file_links[file.format].append(
+                    {
+                        "link_text": link_text_map[translation.language],
+                        "url": file.get_file_url(),
+                    }
+                )
+
+        return Response(file_links, status=status.HTTP_200_OK)
