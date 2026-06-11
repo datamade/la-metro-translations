@@ -56,18 +56,34 @@ class DocumentFilesView(APIView):
         api_key = request.query_params.get("api_key")
         entity_type = request.query_params.get("entity_type")
         document_id = request.query_params.get("document_id")
-        link_text_map = {
+        agenda_text_map = {
             "hye": "Օրակարգը ներբեռնել (Արևելահայերեն)",
             "hyw": "Ներբեռնել Օրակարգը (Արևմտահայերէն)",
             "zho-cn": "下载议程 (汉语)",
             "zho-tw": "下載議程 (漢語)",
             "eng": "Download Agenda (English)",
-            "jpn": "議事日程のダウンロード (日本語)",
+            "jpn": "議題をダウンロード (日本語)",
             "kor": "의제 다운로드 (한국어)",
             "rus": "Скачать повестку дня (Русский)",
             "spa": "Descargar Agenda (Español)",
             "vie": "Tải xuống Chương trình (tiếng Việt)",
         }
+        board_report_text_map = {
+            "hye": "Download Board Report (Արևելահայերեն)",
+            "hyw": "Download Board Report (Արևմտահայերէն)",
+            "zho-cn": "Download Board Report (汉语)",
+            "zho-tw": "Download Board Report (漢語)",
+            "eng": "Download Board Report (English)",
+            "jpn": "Download Board Report (日本語)",
+            "kor": "Download Board Report (한국어)",
+            "rus": "Download Board Report (Русский)",
+            "spa": "Download Board Report (Español)",
+            "vie": "Download Board Report (tiếng Việt)",
+        }
+
+        link_text_map = (
+            agenda_text_map if entity_type == "event" else board_report_text_map
+        )
 
         if api_key != settings.BOARDAGENDAS_API_KEY:
             error_msg = "Unauthorized: Invalid api key. Double check the key submitted."
@@ -85,12 +101,17 @@ class DocumentFilesView(APIView):
         for translation in content.translations.all():
             for file in translation.files.all():
                 if translation.language == "eng" and file.format == "pdf":
+                    # Don't bother with english pdf
                     continue
-                file_links[file.format].append(
-                    {
-                        "link_text": link_text_map[translation.language],
-                        "url": file.get_file_url(),
-                    }
-                )
+
+                link_details = {
+                    "link_text": link_text_map[translation.language],
+                    "url": file.get_file_url(),
+                }
+                if translation.language == "eng" and file.format == "rtf":
+                    # Put english rtf at beginning of list
+                    file_links[file.format].insert(0, link_details)
+                else:
+                    file_links[file.format].append(link_details)
 
         return Response(file_links, status=status.HTTP_200_OK)
