@@ -99,6 +99,10 @@ class DocumentFilesView(APIView):
 
         file_links = {"pdf": [], "rtf": []}
         for translation in content.translations.all():
+            # Only return approved translations
+            if translation.approval_status != "approved":
+                continue
+
             for file in translation.files.all():
                 if translation.language == "eng" and file.format == "pdf":
                     # Don't bother with english pdf
