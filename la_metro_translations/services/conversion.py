@@ -5,7 +5,6 @@ import re
 import tempfile
 import pypandoc
 
-from PIL import Image as PILImage
 from weasyprint import HTML
 
 from django.core.files.uploadedfile import InMemoryUploadedFile
@@ -71,22 +70,10 @@ class DocumentTranslationConverter:
         )
 
     def _image_uri_to_tempfile(self, media_type: str, b64data: str) -> str:
-        """Decode a base64 image URI to a temporary PNG file, returning its path.
-
-        Converts to PNG unconditionally unless the source is already PNG, so
-        that RTF viewers render \\pngblip rather than \\jpegblip (which Pages
-        and some other viewers ignore).
-        """
+        """Decode a base64 image URI to a temporary file, returning its path."""
         img_bytes = base64.b64decode(b64data)
-        if media_type == "png":
-            png_bytes = img_bytes
-        else:
-            png_buf = io.BytesIO()
-            PILImage.open(io.BytesIO(img_bytes)).save(png_buf, format="PNG")
-            png_bytes = png_buf.getvalue()
-
-        tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-        tmp.write(png_bytes)
+        tmp = tempfile.NamedTemporaryFile(suffix=f".{media_type}", delete=False)
+        tmp.write(img_bytes)
         tmp.close()
         return tmp.name
 
@@ -114,7 +101,7 @@ class DocumentTranslationConverter:
 
         try:
             # RTF embeds images as hex, but pandoc only handles file paths — not
-            # base64 data URIs. Decode each URI to a temp PNG so pandoc can read it.
+            # base64 data URIs. Decode each URI to a temp file so pandoc can read it.
             pattern = r"!\[.*?\]\(data:image/(\w+);base64,([^)]+)\)"
 
             def replace_with_tempfile(match):
