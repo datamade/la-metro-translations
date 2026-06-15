@@ -54,6 +54,10 @@ class DocumentFilesView(APIView):
 
     def get(self, request):
         api_key = request.query_params.get("api_key")
+        if api_key != settings.BOARDAGENDAS_API_KEY:
+            error_msg = "Unauthorized: Invalid api key. Double check the key submitted."
+            return Response(error_msg, status=status.HTTP_403_FORBIDDEN)
+
         entity_type = request.query_params.get("entity_type")
         document_id = request.query_params.get("document_id")
         agenda_text_map = {
@@ -84,10 +88,6 @@ class DocumentFilesView(APIView):
         link_text_map = (
             agenda_text_map if entity_type == "event" else board_report_text_map
         )
-
-        if api_key != settings.BOARDAGENDAS_API_KEY:
-            error_msg = "Unauthorized: Invalid api key. Double check the key submitted."
-            return Response(error_msg, status=status.HTTP_403_FORBIDDEN)
 
         try:
             content = DocumentContent.objects.prefetch_related(
