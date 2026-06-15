@@ -1,5 +1,7 @@
 from django.conf import settings
 from django.db.models import Prefetch
+from django.db.models import Case, When
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -95,10 +97,29 @@ class DocumentFilesView(APIView):
             agenda_text_map if entity_type == "event" else board_report_text_map
         )
 
+        lang_order = [
+            "eng",
+            "spa",
+            "zho-cn",
+            "zho-tw",
+            "kor",
+            "hye",
+            "hyw",
+            "vie",
+            "rus",
+            "jpn",
+        ]
+        ordered = Case(
+            *[
+                When(language=language, then=index)
+                for index, language in enumerate(lang_order)
+            ]
+        )
+
         # Only return relevant related objects
         translation_filter = DocumentTranslation.objects.filter(
             approval_status="approved"
-        )
+        ).order_by(ordered)
         files_filter = TranslationFile.objects.exclude(
             document_translation__language="eng", format="pdf"
         )
@@ -118,10 +139,6 @@ class DocumentFilesView(APIView):
                     "link_text": link_text_map[translation.language],
                     "url": file.get_file_url(),
                 }
-                if translation.language == "eng" and file.format == "rtf":
-                    # Put english rtf at beginning of list
-                    file_links[file.format].insert(0, link_details)
-                else:
-                    file_links[file.format].append(link_details)
+                file_links[file.format].append(link_details)
 
         return Response(file_links, status=status.HTTP_200_OK)
