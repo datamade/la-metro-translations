@@ -1,9 +1,15 @@
 from django.conf import settings
+from django.db.models import Prefetch
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
-from la_metro_translations.models import Document, DocumentContent
+from la_metro_translations.models import (
+    Document,
+    DocumentContent,
+    DocumentTranslation,
+    TranslationFile,
+)
 from la_metro_translations.api.serializers import NotificationSerializer
 
 
@@ -89,9 +95,17 @@ class DocumentFilesView(APIView):
             agenda_text_map if entity_type == "event" else board_report_text_map
         )
 
+        # Only return relevant related objects
+        translation_filter = DocumentTranslation.objects.filter(
+            approval_status="approved"
+        )
+        files_filter = TranslationFile.objects.exclude(
+            document_translation__language="eng", format="pdf"
+        )
         try:
             content = DocumentContent.objects.prefetch_related(
-                "translations", "translations__files"
+                Prefetch("translations", translation_filter),
+                Prefetch("translations__files", files_filter),
             ).get(document__entity_type=entity_type, document__document_id=document_id)
         except DocumentContent.DoesNotExist:
             error_msg = "Not Found: Matching document does not exist in the suite."
@@ -99,15 +113,7 @@ class DocumentFilesView(APIView):
 
         file_links = {"pdf": [], "rtf": []}
         for translation in content.translations.all():
-            # Only return approved translations
-            if translation.approval_status != "approved":
-                continue
-
             for file in translation.files.all():
-                if translation.language == "eng" and file.format == "pdf":
-                    # Don't bother with english pdf
-                    continue
-
                 link_details = {
                     "link_text": link_text_map[translation.language],
                     "url": file.get_file_url(),
