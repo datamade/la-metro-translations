@@ -76,10 +76,13 @@ class Command(BaseCommand):
         )
 
         logger.info("Checking for translations that need up to date PDFs...")
-        pdf_qs = DocumentTranslation.objects.exclude(
-            pk__in=Subquery(up_to_date_pdfs.values("document_translation")),
-            language="eng",
-        ).select_related("document_content__document")
+        pdf_qs = (
+            DocumentTranslation.objects.exclude(
+                pk__in=Subquery(up_to_date_pdfs.values("document_translation"))
+            )
+            .exclude(language="eng")
+            .select_related("document_content__document")
+        )
         for doc in tqdm(pdf_qs.iterator(chunk_size=chunk_size), total=pdf_qs.count()):
             self.meter_files_in_memory(files_to_create, chunk_size)
             try:
