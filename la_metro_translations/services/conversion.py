@@ -32,6 +32,9 @@ class DocumentTranslationConverter:
     def convert_to_pdf(self) -> TranslationFile:
         md_text = self.doc_translation.markdown or ""
 
+        # Strip alt text.
+        md_text = re.sub(r"!\[[^]]+\]", "![]", md_text)
+
         try:
             # Pypandoc requires PDFs to be written to the filesystem so
             # we can first convert the markdown to HTML and then use
