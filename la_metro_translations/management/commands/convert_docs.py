@@ -2,6 +2,7 @@ import logging
 from datetime import datetime
 from django.core.management.base import BaseCommand
 from django.db.models import OuterRef, Subquery
+from django.db import connections
 from tqdm import tqdm
 
 from la_metro_translations.models import DocumentTranslation, TranslationFile
@@ -23,6 +24,10 @@ class Command(BaseCommand):
             default=None,
             help="The ID of the document translation to convert.",
         )
+
+    def reset_db_connections(self):
+        for conn in connections.all():
+            conn.close_if_unusable_or_obsolete()
 
     def handle(self, *args, **options):
         """
@@ -96,6 +101,7 @@ class Command(BaseCommand):
             logger.info("All translations have up to date RTFs and PDFs!")
             return
 
+        self.reset_db_connections()
         self.bulk_create_translation_files(files_to_create)
 
         logger.info("--- Finished! ---")
@@ -120,5 +126,6 @@ class Command(BaseCommand):
         of files in memory. Prevents Heroku "memory quota vastly exceeded" errors.
         """
         if len(files_to_create) >= chunk_size:
+            self.reset_db_connections()
             self.bulk_create_translation_files(files_to_create)
             del files_to_create[:]
