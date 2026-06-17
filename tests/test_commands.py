@@ -1,15 +1,22 @@
+import itertools
 import pytest
+from datetime import datetime, timedelta
 from unittest.mock import patch
 
 from django.core.management import call_command as run_command
 
 from conftest import (
+    DocumentContentFactory,
     DocumentFactory,
     DocumentTranslationFactory,
     ExtractionConfigFactory,
     TranslationConfigFactory,
 )
-from la_metro_translations.models import DocumentContent, DocumentTranslation
+from la_metro_translations.models import (
+    DocumentContent,
+    DocumentTranslation,
+    TranslationFile,
+)
 
 PATCH_OCR = (
     "la_metro_translations.management.commands.batch_extract"
@@ -30,6 +37,10 @@ PATCH_EXTRACT_RESET_DB = (
     ".Command.reset_db_connections"
 )
 
+PATCH_TRANSLATE_SERVICE = (
+    "la_metro_translations.management.commands.batch_translate.get_translation_service"
+)
+
 
 @pytest.mark.django_db
 class TestBatchTranslateCommand:
@@ -43,6 +54,17 @@ class TestBatchTranslateCommand:
     def no_reset_db(self):
         with patch(PATCH_TRANSLATE_RESET_DB):
             yield
+
+    @pytest.fixture(autouse=True)
+    def mock_translate_service(self, document_content):
+        with patch(PATCH_TRANSLATE_SERVICE) as mock_service:
+            mock_service.return_value.metered_batch_translate.return_value = [
+                {
+                    "document_id": str(document_content.document.document_id),
+                    "markdown": "translated text",
+                }
+            ]
+            yield mock_service
 
     @pytest.mark.parametrize("approval_status", ["waiting", "approved"])
     def test_creates_translations_with_correct_approval_status(
@@ -202,3 +224,136 @@ class TestBatchExtractCommand:
         run_command("batch_extract")
 
         mock_call_command.assert_not_called()
+
+
+@pytest.mark.django_db
+class TestConvertDocsCommand:
+    """
+    Tests for the convert_docs management command.
+
+    This focuses on how the command creates RTFs for all DocumentTranslations with out-of-date RTFs,
+    and PDFs for all non-English DocumentTranslations with out-of-date PDFs.
+    """
+
+    @pytest.fixture
+    def doc_id_counter(self):
+        counter = itertools.count(1)
+        return lambda: next(counter)
+
+    @pytest.fixture
+    def make_translation(self, doc_id_counter):
+        def _make(language="spa"):
+            doc = DocumentFactory(document_id=doc_id_counter())
+            content = DocumentContentFactory(document=doc)
+            return DocumentTranslationFactory(
+                document_content=content, language=language
+            )
+
+        return _make
+
+    def _set_updated_at(self, obj, dt):
+        type(obj).objects.filter(pk=obj.pk).update(updated_at=dt)
+        obj.refresh_from_db()
+
+    def _make_translation_file(self, translation, fmt, updated_at=None):
+        file = TranslationFile.objects.create(
+            document_translation=translation, format=fmt
+        )
+        if updated_at is not None:
+            TranslationFile.objects.filter(pk=file.pk).update(updated_at=updated_at)
+        return file
+
+    def test_rtf_created_only_for_translations_without_up_to_date_rtf(
+        self, make_translation, mock_converter
+    ):
+        """
+        Only translations missing an RTF or with an outdated RTF (file.updated_at <
+        translation.updated_at) should be processed. Translations with a current RTF
+        must be skipped.
+        """
+        now = datetime.now()
+        past = now - timedelta(hours=1)
+
+        make_translation()  # creates translation missing an RTF
+
+        outdated_rtf = make_translation()  # RTF exists but is stale
+        self._set_updated_at(outdated_rtf, now)
+        self._make_translation_file(outdated_rtf, "rtf", updated_at=past)
+
+        up_to_date = make_translation()  # RTF is current
+        self._set_updated_at(up_to_date, past)
+        self._make_translation_file(up_to_date, "rtf", updated_at=now)
+
+        run_command("convert_docs")
+
+        assert mock_converter.convert_to_rtf.call_count == 2
+
+    def test_pdf_created_only_for_non_english_translations_without_up_to_date_pdf(
+        self, make_translation, mock_converter
+    ):
+        """
+        PDFs should only be created for non-English translations that are missing a
+        PDF or have an outdated one. English translations and those with a current PDF
+        must be skipped.
+
+        This test guards against the exclude() multi-argument bug where
+        .exclude(pk__in=..., language="eng") only excluded rows matching BOTH
+        conditions simultaneously, causing the queryset to return nearly all rows.
+        """
+        now = datetime.now()
+        past = now - timedelta(hours=1)
+
+        make_translation(language="eng")  # always skip eng, even without a PDF
+
+        make_translation(language="spa")  # creates translation missing a PDF
+
+        outdated = make_translation(language="zho-cn")  # PDF exists but is stale
+        self._set_updated_at(outdated, now)
+        self._make_translation_file(outdated, "pdf", updated_at=past)
+
+        up_to_date = make_translation(language="kor")  # PDF is current
+        self._set_updated_at(up_to_date, past)
+        self._make_translation_file(up_to_date, "pdf", updated_at=now)
+
+        run_command("convert_docs")
+
+        assert mock_converter.convert_to_pdf.call_count == 2
+
+    def test_no_files_created_when_all_are_up_to_date(
+        self, make_translation, mock_converter
+    ):
+        """
+        When every translation already has a current RTF and PDF, no converter calls
+        should be made and bulk_create should not be invoked.
+        """
+        now = datetime.now()
+        past = now - timedelta(hours=1)
+
+        non_eng = make_translation(language="spa")
+        self._set_updated_at(non_eng, past)
+        self._make_translation_file(non_eng, "rtf", updated_at=now)
+        self._make_translation_file(non_eng, "pdf", updated_at=now)
+
+        eng = make_translation(language="eng")
+        self._set_updated_at(eng, past)
+        self._make_translation_file(eng, "rtf", updated_at=now)
+
+        run_command("convert_docs")
+
+        mock_converter.convert_to_rtf.assert_not_called()
+        mock_converter.convert_to_pdf.assert_not_called()
+        mock_converter.bulk_create.assert_not_called()
+
+    def test_convert_doc_single_creates_rtf_and_pdf_for_non_english(
+        self, make_translation, mock_converter
+    ):
+        """
+        When called with --document_translation <id> for a non-English translation,
+        the command should create both an RTF and a PDF.
+        """
+        translation = make_translation(language="spa")
+
+        run_command("convert_docs", document_translation=translation.pk)
+
+        mock_converter.convert_to_rtf.assert_called_once()
+        mock_converter.convert_to_pdf.assert_called_once()

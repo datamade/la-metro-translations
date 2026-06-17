@@ -5,11 +5,20 @@ from django.contrib.auth.models import Permission, Group
 import factory
 import pytest
 
+from la_metro_translations.management.commands.convert_docs import (
+    Command as convert_docs_command,
+)
+
 from django.contrib.contenttypes.models import ContentType
 from la_metro_translations.models import (
     Document,
     DocumentContent,
     DocumentTranslation,
+)
+
+_PATCH_CONVERT_DOCS_CONVERTER = (
+    "la_metro_translations.management.commands.convert_docs"
+    ".DocumentTranslationConverter"
 )
 
 
@@ -134,6 +143,17 @@ def wagtail_user(django_user_model, wagtail_user_group):
     wagtail_user.groups.add(wagtail_user_group)
     wagtail_user.save()
     return wagtail_user, password
+
+
+@pytest.fixture
+def mock_converter(mocker):
+    bulk_create = mocker.patch.object(
+        convert_docs_command, "bulk_create_translation_files"
+    )
+    converter_cls = mocker.patch(_PATCH_CONVERT_DOCS_CONVERTER)
+    instance = converter_cls.return_value
+    instance.bulk_create = bulk_create
+    return instance
 
 
 @pytest.fixture

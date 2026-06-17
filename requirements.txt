@@ -9,6 +9,7 @@ pip==25.3
 psycopg2-binary==2.9.11
 pytest==9.0.2
 pytest-django
+pytest-mock
 factory-boy
 sentry-sdk==2.49.0
 setuptools==80.9.0
