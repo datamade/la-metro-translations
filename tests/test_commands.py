@@ -1,7 +1,7 @@
 import itertools
 import pytest
 from datetime import datetime, timedelta
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from django.core.management import call_command as run_command
 
@@ -12,7 +12,6 @@ from conftest import (
     ExtractionConfigFactory,
     TranslationConfigFactory,
 )
-from la_metro_translations.management.commands.convert_docs import Command
 from la_metro_translations.models import (
     DocumentContent,
     DocumentTranslation,
@@ -36,11 +35,6 @@ PATCH_TRANSLATE_RESET_DB = (
 PATCH_EXTRACT_RESET_DB = (
     "la_metro_translations.management.commands.batch_extract"
     ".Command.reset_db_connections"
-)
-
-PATCH_CONVERT_DOCS_CONVERTER = (
-    "la_metro_translations.management.commands.convert_docs"
-    ".DocumentTranslationConverter"
 )
 
 PATCH_TRANSLATE_SERVICE = (
@@ -269,11 +263,8 @@ class TestConvertDocsCommand:
             TranslationFile.objects.filter(pk=file.pk).update(updated_at=updated_at)
         return file
 
-    def _mock_converter(self):
-        return patch(PATCH_CONVERT_DOCS_CONVERTER)
-
     def test_rtf_created_only_for_translations_without_up_to_date_rtf(
-        self, make_translation
+        self, make_translation, mock_converter
     ):
         """
         Only translations missing an RTF or with an outdated RTF (file.updated_at <
@@ -293,18 +284,12 @@ class TestConvertDocsCommand:
         self._set_updated_at(up_to_date, past)
         self._make_translation_file(up_to_date, "rtf", updated_at=now)
 
-        with self._mock_converter() as MockConverter, patch.object(
-            Command, "bulk_create_translation_files"
-        ):
-            mock_instance = MockConverter.return_value
-            mock_instance.convert_to_rtf.return_value = MagicMock()
-            mock_instance.convert_to_pdf.return_value = MagicMock()
-            run_command("convert_docs")
+        run_command("convert_docs")
 
-        assert mock_instance.convert_to_rtf.call_count == 2
+        assert mock_converter.convert_to_rtf.call_count == 2
 
     def test_pdf_created_only_for_non_english_translations_without_up_to_date_pdf(
-        self, make_translation
+        self, make_translation, mock_converter
     ):
         """
         PDFs should only be created for non-English translations that are missing a
@@ -330,17 +315,13 @@ class TestConvertDocsCommand:
         self._set_updated_at(up_to_date, past)
         self._make_translation_file(up_to_date, "pdf", updated_at=now)
 
-        with self._mock_converter() as MockConverter, patch.object(
-            Command, "bulk_create_translation_files"
-        ):
-            mock_instance = MockConverter.return_value
-            mock_instance.convert_to_rtf.return_value = MagicMock()
-            mock_instance.convert_to_pdf.return_value = MagicMock()
-            run_command("convert_docs")
+        run_command("convert_docs")
 
-        assert mock_instance.convert_to_pdf.call_count == 2
+        assert mock_converter.convert_to_pdf.call_count == 2
 
-    def test_no_files_created_when_all_are_up_to_date(self, make_translation):
+    def test_no_files_created_when_all_are_up_to_date(
+        self, make_translation, mock_converter
+    ):
         """
         When every translation already has a current RTF and PDF, no converter calls
         should be made and bulk_create should not be invoked.
@@ -357,18 +338,14 @@ class TestConvertDocsCommand:
         self._set_updated_at(eng, past)
         self._make_translation_file(eng, "rtf", updated_at=now)
 
-        with self._mock_converter() as MockConverter, patch.object(
-            Command, "bulk_create_translation_files"
-        ) as mock_bulk_create:
-            mock_instance = MockConverter.return_value
-            run_command("convert_docs")
+        run_command("convert_docs")
 
-        mock_instance.convert_to_rtf.assert_not_called()
-        mock_instance.convert_to_pdf.assert_not_called()
-        mock_bulk_create.assert_not_called()
+        mock_converter.convert_to_rtf.assert_not_called()
+        mock_converter.convert_to_pdf.assert_not_called()
+        mock_converter.bulk_create.assert_not_called()
 
     def test_convert_doc_single_creates_rtf_and_pdf_for_non_english(
-        self, make_translation
+        self, make_translation, mock_converter
     ):
         """
         When called with --document_translation <id> for a non-English translation,
@@ -376,13 +353,7 @@ class TestConvertDocsCommand:
         """
         translation = make_translation(language="spa")
 
-        with self._mock_converter() as MockConverter, patch.object(
-            Command, "bulk_create_translation_files"
-        ):
-            mock_instance = MockConverter.return_value
-            mock_instance.convert_to_rtf.return_value = MagicMock()
-            mock_instance.convert_to_pdf.return_value = MagicMock()
-            run_command("convert_docs", document_translation=translation.pk)
+        run_command("convert_docs", document_translation=translation.pk)
 
-        mock_instance.convert_to_rtf.assert_called_once()
-        mock_instance.convert_to_pdf.assert_called_once()
+        mock_converter.convert_to_rtf.assert_called_once()
+        mock_converter.convert_to_pdf.assert_called_once()
