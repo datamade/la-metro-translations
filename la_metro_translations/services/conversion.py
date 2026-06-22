@@ -9,7 +9,10 @@ from weasyprint import HTML
 
 from django.core.files.uploadedfile import InMemoryUploadedFile
 
-from la_metro_translations.models import TranslationFile, DocumentTranslation
+from la_metro_translations.models import (
+    TranslationFile,
+    DocumentTranslation,
+)
 
 
 class DocumentTranslationConverterError(Exception):

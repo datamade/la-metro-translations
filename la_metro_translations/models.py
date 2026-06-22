@@ -611,3 +611,11 @@ class TranslationConfig(Orderable):
                 get_backend().start_job("convert_docs")
         else:
             super().save(*args, **kwargs)
+
+
+class Disclaimer(models.Model):
+    language = models.CharField(choices=DocumentTranslation.LANGUAGE_CHOICES)
+    disclaimer_text = models.TextField()
+
+    def __str__(self):
+        return f"{self.get_language_display()} [{self.language}] Disclaimer"

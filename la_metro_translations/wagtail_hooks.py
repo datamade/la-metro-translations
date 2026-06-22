@@ -5,13 +5,20 @@ from wagtail.admin.viewsets.model import ModelViewSet
 from wagtail.admin.filters import WagtailFilterSet
 from wagtail.contrib.settings.registry import register_setting
 from wagtail.permissions import ModelPermissionPolicy
-from wagtail.snippets.views.snippets import IndexView
+from wagtail.snippets.views.snippets import IndexView, SnippetViewSet
+from wagtail.snippets.models import register_snippet
 
 from django_filters import CharFilter, ChoiceFilter
 from django.urls import path, reverse
 from .views import PromptView
 
-from .models import Document, DocumentContent, DocumentTranslation, ExtractionConfig
+from .models import (
+    Document,
+    DocumentContent,
+    DocumentTranslation,
+    ExtractionConfig,
+    Disclaimer,
+)
 from .panels import PropertyPanel, RelatedObjectsPanel
 
 
@@ -381,6 +388,19 @@ class DocumentTranslationViewSet(ModelViewSet):
     ]
 
 
+class DisclaimerViewSet(SnippetViewSet):
+
+    model = Disclaimer
+
+    panels = [
+        FieldPanel("language"),
+        FieldPanel("disclaimer_text"),
+    ]
+
+
+register_snippet(DisclaimerViewSet)
+
+
 @hooks.register("register_admin_viewset")
 def register_document_viewset():
     return DocumentViewSet("document")
@@ -410,6 +430,16 @@ register_setting(ExtractionConfig, icon="cog", order=50)
 @hooks.register("register_settings_menu_item")
 def register_prompt_menu_item():
     return MenuItem("Prompt", reverse("prompt"), icon_name="openquote", order=51)
+
+
+@hooks.register("register_settings_menu_item")
+def register_disclaimer_menu_item():
+    return MenuItem(
+        "Disclaimers",
+        reverse("wagtailsnippets_la_metro_translations_disclaimer:list"),
+        icon_name="info-circle",
+        order=52,
+    )
 
 
 # Only show selected elements in main menu
