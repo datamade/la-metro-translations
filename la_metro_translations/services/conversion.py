@@ -133,7 +133,6 @@ class DocumentTranslationConverter:
                     pass
 
         filename = self.doc_translation.document_content.document.title
-        content_type = "application/rtf"
 
         # Add encoding strings to make sure file renders correctly
         pre_bytes = (
