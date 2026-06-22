@@ -40,7 +40,7 @@ class DocumentTranslationConverter:
             raise DocumentTranslationConverterError(
                 f"No disclaimer found for target language: {language}"
             )
-        formatted_disclaimer = f"*{disclaimer.disclaimer_text}*\n\n"
+        formatted_disclaimer = f"{disclaimer.disclaimer_text}\n\n---\n\n"
         return formatted_disclaimer + text
 
     def convert_to_pdf(self) -> TranslationFile:
