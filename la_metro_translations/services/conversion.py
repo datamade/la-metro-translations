@@ -34,8 +34,13 @@ class DocumentTranslationConverter:
         )
 
     def _prepend_disclaimer(self, language, text):
-        disclaimer = Disclaimer.objects.get(language=language).disclaimer_text
-        return disclaimer + text
+        try:
+            disclaimer = Disclaimer.objects.get(language=language)
+        except Disclaimer.DoesNotExist:
+            raise DocumentTranslationConverterError(
+                f"No disclaimer found for target language: {language}"
+            )
+        return disclaimer.disclaimer_text + text
 
     def convert_to_pdf(self) -> TranslationFile:
         md_text = self.doc_translation.markdown or ""
