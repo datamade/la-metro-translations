@@ -619,3 +619,6 @@ class Disclaimer(models.Model):
 
     def __str__(self):
         return f"{self.get_language_display()} [{self.language}] Disclaimer"
+
+    class Meta:
+        ordering = ["language"]
