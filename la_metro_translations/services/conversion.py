@@ -9,7 +9,11 @@ from weasyprint import HTML
 
 from django.core.files.uploadedfile import InMemoryUploadedFile
 
-from la_metro_translations.models import TranslationFile, DocumentTranslation
+from la_metro_translations.models import (
+    Disclaimer,
+    TranslationFile,
+    DocumentTranslation,
+)
 
 
 class DocumentTranslationConverterError(Exception):
@@ -29,11 +33,29 @@ class DocumentTranslationConverter:
             + "/../static/css/converted_docs.css"
         )
 
+    def _prepend_disclaimer(self, language, text):
+        # All documents also get "translated" into English with no disclaimer
+        # Shortcircuit in that case
+        if language == "eng":
+            return text
+
+        try:
+            disclaimer = Disclaimer.objects.get(language=language)
+        except Disclaimer.DoesNotExist:
+            raise DocumentTranslationConverterError(
+                f"No disclaimer found for target language: {language}"
+            )
+        formatted_disclaimer = f"{disclaimer.disclaimer_text}\n\n---\n\n"
+        return formatted_disclaimer + text
+
     def convert_to_pdf(self) -> TranslationFile:
         md_text = self.doc_translation.markdown or ""
 
         # Strip alt text.
         md_text = re.sub(r"!\[[^]]+\]", "![]", md_text)
+
+        language = self.doc_translation.language
+        md_text = self._prepend_disclaimer(language, md_text)
 
         try:
             # Pypandoc requires PDFs to be written to the filesystem so
@@ -49,7 +71,6 @@ class DocumentTranslationConverter:
             raise DocumentTranslationConverterError(f"Conversion failed: {e}")
 
         filename = self.doc_translation.document_content.document.title
-        language = self.doc_translation.language
 
         buffer = io.BytesIO()
         buffer.write(pdf_bytes)
@@ -79,6 +100,9 @@ class DocumentTranslationConverter:
     def convert_to_rtf(self) -> TranslationFile:
         md_text = self.doc_translation.markdown or ""
         temp_files = []
+
+        language = self.doc_translation.language
+        md_text = self._prepend_disclaimer(language, md_text)
 
         try:
             # RTF embeds images as hex, but pandoc only handles file paths — not
@@ -114,7 +138,6 @@ class DocumentTranslationConverter:
                     pass
 
         filename = self.doc_translation.document_content.document.title
-        language = self.doc_translation.language
 
         # Add encoding strings to make sure file renders correctly
         pre_bytes = (
