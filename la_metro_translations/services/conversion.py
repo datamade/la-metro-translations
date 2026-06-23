@@ -34,6 +34,11 @@ class DocumentTranslationConverter:
         )
 
     def _prepend_disclaimer(self, language, text):
+        # All documents also get "translated" into English with no disclaimer
+        # Shortcircuit in that case
+        if language == "eng":
+            return text
+
         try:
             disclaimer = Disclaimer.objects.get(language=language)
         except Disclaimer.DoesNotExist:
