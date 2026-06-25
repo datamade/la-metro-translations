@@ -395,12 +395,12 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
             for f in self.files.all():
                 files_btns += (
                     "<a class='button'"
-                    "style='width: stretch; font-weight: bold; text-align: center;'"
+                    "style='flex: 1; font-weight: bold; text-align: center;'"
                     f"target='_blank' href='{f.get_file_url()}'>{f.format.upper()}</a>"
                 )
 
             return format_html(
-                "<div style='display: flex; justify-content: space-between'>{}</div>",
+                "<div style='display: flex; gap: 0.5rem;'>{}</div>",
                 mark_safe(files_btns),
             )
 
