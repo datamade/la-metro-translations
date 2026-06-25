@@ -6,6 +6,7 @@ from django.db import models
 from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
+from django.utils.formats import date_format
 
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
@@ -390,6 +391,17 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
     language_display.short_description = "Language"
 
     def file_formats_display(self):
+        latest_file = self.files.order_by("-updated_at").first()
+        conversion_date = latest_file.updated_at if latest_file else None
+        conversion_date_str = (
+            date_format(conversion_date, "N j, Y, P") if conversion_date else None
+        )
+        conversion_message = (
+            f"Generated {conversion_date_str}"
+            if conversion_date_str
+            else "No PDF or RTF files have been generated for this translation."
+        )
+
         if getattr(self, "files", False):
             files_btns = ""
             for f in self.files.all():
@@ -400,8 +412,10 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
                 )
 
             return format_html(
-                "<div style='display: flex; gap: 0.5rem;'>{}</div>",
+                "<div style='display: flex; gap: 0.5rem;'>{}</div>"
+                "<div class='help' style='margin-top: .5rem'>{}</div>",
                 mark_safe(files_btns),
+                conversion_message,
             )
 
         return mark_safe(
