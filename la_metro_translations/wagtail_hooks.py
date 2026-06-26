@@ -63,6 +63,7 @@ class DocumentViewSet(ModelViewSet):
         "source_url_display",
         "board_agendas_url_display",
     ]
+    ordering = ["-updated_at"]
 
     @property
     def permission_policy(self):

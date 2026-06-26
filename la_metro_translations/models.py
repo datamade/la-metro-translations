@@ -57,6 +57,7 @@ class AdminDisplayMixin:
         return "-"
 
     updated_at_display.short_description = "Updated At"
+    updated_at_display.admin_order_field = "updated_at"
 
     def edit_link_display(self):
         edit_url = reverse(
@@ -98,13 +99,11 @@ class Document(AdminDisplayMixin, models.Model):
     title = models.CharField()
     source_url = models.URLField(help_text="Link to the original pdf document.")
     created_at = models.DateTimeField(
-        auto_now_add=True,
         help_text=(
             "Date this original document was created, as per the BoardAgendas app."
         ),
     )
     updated_at = models.DateTimeField(
-        auto_now=True,
         help_text=(
             "Date this original document was updated, as per the BoardAgendas app."
         ),
@@ -264,7 +263,7 @@ class DocumentContent(AdminDisplayMixin, models.Model):
         files_btns = files_btn_fragment.format(self.document.source_url, "Original PDF")
 
         try:
-            rtf = self.translations.get(language="en").files.get(format="rtf")
+            rtf = self.translations.get(language="eng").files.get(format="rtf")
         except (DocumentTranslation.DoesNotExist, TranslationFile.DoesNotExist):
             pass
         else:
