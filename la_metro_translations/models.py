@@ -97,13 +97,11 @@ class Document(AdminDisplayMixin, models.Model):
     title = models.CharField()
     source_url = models.URLField(help_text="Link to the original pdf document.")
     created_at = models.DateTimeField(
-        auto_now_add=True,
         help_text=(
             "Date this original document was created, as per the BoardAgendas app."
         ),
     )
     updated_at = models.DateTimeField(
-        auto_now=True,
         help_text=(
             "Date this original document was updated, as per the BoardAgendas app."
         ),
