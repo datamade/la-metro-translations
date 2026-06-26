@@ -28,6 +28,8 @@ class DocumentFactory(factory.django.DjangoModelFactory):
 
     title = "Test Document"
     source_url = "dummy url"
+    created_at = "2026-01-20 10:05:00"
+    updated_at = "2026-01-21 11:45:00"
     document_type = "bill_document"
     document_id = 999
     entity_type = "bill"
