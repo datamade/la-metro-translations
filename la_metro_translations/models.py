@@ -56,6 +56,7 @@ class AdminDisplayMixin:
         return "-"
 
     updated_at_display.short_description = "Updated At"
+    updated_at_display.admin_order_field = "updated_at"
 
     def edit_link_display(self):
         edit_url = reverse(
