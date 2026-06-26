@@ -262,7 +262,7 @@ class DocumentContent(AdminDisplayMixin, models.Model):
         files_btns = files_btn_fragment.format(self.document.source_url, "Original PDF")
 
         try:
-            rtf = self.translations.get(language="en").files.get(format="rtf")
+            rtf = self.translations.get(language="eng").files.get(format="rtf")
         except (DocumentTranslation.DoesNotExist, TranslationFile.DoesNotExist):
             pass
         else:
