@@ -122,16 +122,18 @@ class MistralOCRService:
     @staticmethod
     def process_pages(pages: List[dict], document_type: str) -> str:
         """
-        Reinserts tables, images, and links into the markdown of each page.
+        Formats all headers to be the same level.
+        Then reinserts tables, images, and links into the markdown of each page.
         """
 
         doc_text = ""
 
         for page in pages:
-            markdown = page["markdown"]
-
             # Unescaped dollar signs cause unintended math formatting
-            markdown = markdown.replace("$", "\\$")
+            raw_markdown = page["markdown"].replace("$", "\\$")
+
+            # Format all markdown headers to be h3 level
+            markdown = re.sub(r"^#{1,6}\s+", "### ", raw_markdown, flags=re.MULTILINE)
 
             # Insert extracted tables, images, and links
             for table in page["tables"]:
