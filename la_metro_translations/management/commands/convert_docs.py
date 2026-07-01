@@ -27,7 +27,7 @@ class Command(BaseCommand):
 
     def reset_db_connections(self):
         for conn in connections.all():
-            conn.close_if_unusable_or_obsolete()
+            conn.close()
 
     def handle(self, *args, **options):
         """
