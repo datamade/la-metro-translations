@@ -3,7 +3,7 @@ from datetime import datetime
 
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
-from django.db.models import Q, F
+from django.db.models import Q, F, Case, When
 from django.db import connections
 
 from la_metro_translations.models import (
@@ -138,10 +138,20 @@ class Command(BaseCommand):
         logger.info("--- Finished! ---")
 
     def chain_translations(self, extraction_config):
+        # Order the language batches based on priority
+        lang_priority = DocumentTranslation.get_language_priority()
+        ordered = Case(
+            *[
+                When(language=language, then=index)
+                for index, language in enumerate(lang_priority)
+            ]
+        )
+
+        # Only return relevant related objects
         if extraction_config.auto_approve_extractions:
             for translation_config in TranslationConfig.objects.filter(
                 config=extraction_config
-            ):
+            ).order_by(ordered):
                 language_str = dict(DocumentTranslation.LANGUAGE_CHOICES)[
                     translation_config.language
                 ]
