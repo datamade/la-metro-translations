@@ -3,7 +3,7 @@ from datetime import datetime
 
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
-from django.db.models import F
+from django.db.models import F, Case, When
 from django.db import connections
 
 from la_metro_translations.models import (
@@ -94,12 +94,18 @@ class Command(BaseCommand):
         else:
             # Get any document contents without translations in this language, or
             # contents that have been updated more recently than their translation.
+
+            events_first = Case(
+                When(document__entity_type="event", then=0),
+                default=1,
+            )
             contents = (
                 DocumentContent.objects.select_related("document")
                 .exclude(
                     translations__updated_at__gte=F("updated_at"),
                     translations__language=user_language_value,
                 )
+                .order_by(events_first)
                 .distinct()
             )
 
