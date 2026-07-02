@@ -36,6 +36,10 @@ PATCH_EXTRACT_RESET_DB = (
     "la_metro_translations.management.commands.batch_extract"
     ".Command.reset_db_connections"
 )
+PATCH_CONVERT_RESET_DB = (
+    "la_metro_translations.management.commands.convert_docs"
+    ".Command.reset_db_connections"
+)
 
 PATCH_TRANSLATE_SERVICE = (
     "la_metro_translations.management.commands.batch_translate.get_translation_service"
@@ -234,6 +238,11 @@ class TestConvertDocsCommand:
     This focuses on how the command creates RTFs for all DocumentTranslations with out-of-date RTFs,
     and PDFs for all non-English DocumentTranslations with out-of-date PDFs.
     """
+
+    @pytest.fixture(autouse=True)
+    def no_reset_db(self):
+        with patch(PATCH_CONVERT_RESET_DB):
+            yield
 
     @pytest.fixture
     def doc_id_counter(self):

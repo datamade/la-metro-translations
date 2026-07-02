@@ -423,6 +423,21 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
 
     file_formats_display.short_description = "File Formats"
 
+    @staticmethod
+    def get_language_priority():
+        return [
+            "eng",
+            "spa",
+            "zho-cn",
+            "zho-tw",
+            "kor",
+            "hye",
+            "hyw",
+            "vie",
+            "rus",
+            "jpn",
+        ]
+
 
 def translation_file_path(instance, filename):
     year = instance.document_translation.document_content.document.created_at.year

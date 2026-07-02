@@ -2,7 +2,6 @@ import logging
 from datetime import datetime
 from django.core.management.base import BaseCommand
 from django.db.models import OuterRef, Subquery
-from django.db import connections
 from tqdm import tqdm
 
 from la_metro_translations.models import DocumentTranslation, TranslationFile
@@ -10,11 +9,12 @@ from la_metro_translations.services import (
     DocumentTranslationConverter,
     DocumentTranslationConverterError,
 )
+from la_metro_translations.management.commands.utils import ConnManagerMixin
 
 logger = logging.getLogger(__name__)
 
 
-class Command(BaseCommand):
+class Command(BaseCommand, ConnManagerMixin):
     help = "Creates RTF and PDF translation files"
 
     def add_arguments(self, parser):
@@ -24,10 +24,6 @@ class Command(BaseCommand):
             default=None,
             help="The ID of the document translation to convert.",
         )
-
-    def reset_db_connections(self):
-        for conn in connections.all():
-            conn.close_if_unusable_or_obsolete()
 
     def handle(self, *args, **options):
         """
@@ -64,14 +60,7 @@ class Command(BaseCommand):
         rtf_qs = DocumentTranslation.objects.exclude(
             pk__in=Subquery(up_to_date_rtfs.values("document_translation")),
         ).select_related("document_content__document")
-        for doc in tqdm(rtf_qs.iterator(chunk_size=chunk_size), total=rtf_qs.count()):
-            self.meter_files_in_memory(files_to_create, chunk_size)
-            try:
-                rtf_file = DocumentTranslationConverter(doc).convert_to_rtf()
-            except DocumentTranslationConverterError as e:
-                logger.error(f"Error while converting {doc} to RTF: {e}")
-            else:
-                files_to_create.append(rtf_file)
+        self.batch_convert(rtf_qs, "rtf", files_to_create, chunk_size)
 
         # Create PDFs
         up_to_date_pdfs = TranslationFile.objects.filter(
@@ -88,23 +77,51 @@ class Command(BaseCommand):
             .exclude(language="eng")
             .select_related("document_content__document")
         )
-        for doc in tqdm(pdf_qs.iterator(chunk_size=chunk_size), total=pdf_qs.count()):
-            self.meter_files_in_memory(files_to_create, chunk_size)
-            try:
-                pdf_file = DocumentTranslationConverter(doc).convert_to_pdf()
-            except DocumentTranslationConverterError as e:
-                logger.error(f"Error while converting {doc} to PDF: {e}")
-            else:
-                files_to_create.append(pdf_file)
+        self.batch_convert(pdf_qs, "pdf", files_to_create, chunk_size)
 
-        if not files_to_create:
-            logger.info("All translations have up to date RTFs and PDFs!")
+        logger.info("--- Conversion finished! ---")
+
+    def batch_convert(self, translation_qs, file_format, files_to_create, chunk_size):
+        """
+        Converts files in batches and resets the db connection in between each batch.
+        Also clears in-memory files to maintain acceptable level of Heroku memory usage.
+        """
+        total = translation_qs.count()
+        if total == 0:
+            logger.info(f"All translations have up to date {file_format}s!")
             return
 
-        self.reset_db_connections()
-        self.bulk_create_translation_files(files_to_create)
+        last_pk = 0  # the last item processed in the previous loop
 
-        logger.info("--- Finished! ---")
+        # Perform batch queries until we get to the end of the main qs
+        with tqdm(total=total) as progress:
+            while True:
+                self.reset_db_connections()
+                batch = list(
+                    translation_qs.filter(pk__gt=last_pk).order_by("pk")[:chunk_size]
+                )
+                if not batch:
+                    break
+                for doc in batch:
+                    try:
+                        if file_format == "rtf":
+                            converted_file = DocumentTranslationConverter(
+                                doc
+                            ).convert_to_rtf()
+                        else:
+                            converted_file = DocumentTranslationConverter(
+                                doc
+                            ).convert_to_pdf()
+                    except DocumentTranslationConverterError as e:
+                        logger.error(f"Error converting {doc} to {file_format}: {e}")
+                    else:
+                        files_to_create.append(converted_file)
+                    progress.update(1)
+
+                # Create files, and prepare for next batch
+                last_pk = batch[-1].pk
+                self.bulk_create_translation_files(files_to_create)
+                del files_to_create[:]
 
     def bulk_create_translation_files(self, files_to_create):
         for file in files_to_create:
@@ -118,14 +135,4 @@ class Command(BaseCommand):
             update_fields=["file", "updated_at"],
         )
 
-        logger.info(f"Created a total of {len(files_to_create)} up to date files")
-
-    def meter_files_in_memory(self, files_to_create, chunk_size):
-        """
-        Create files and empty the queue if we've exceeded a reasonable amount
-        of files in memory. Prevents Heroku "memory quota vastly exceeded" errors.
-        """
-        if len(files_to_create) >= chunk_size:
-            self.reset_db_connections()
-            self.bulk_create_translation_files(files_to_create)
-            del files_to_create[:]
+        logger.info(f"Created a total of {len(files_to_create)} up-to-date files")
