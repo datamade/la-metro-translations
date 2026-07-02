@@ -2,7 +2,6 @@ import logging
 from datetime import datetime
 from django.core.management.base import BaseCommand
 from django.db.models import OuterRef, Subquery
-from django.db import connections
 from tqdm import tqdm
 
 from la_metro_translations.models import DocumentTranslation, TranslationFile
@@ -10,11 +9,12 @@ from la_metro_translations.services import (
     DocumentTranslationConverter,
     DocumentTranslationConverterError,
 )
+from la_metro_translations.management.commands.utils import ConnManagerMixin
 
 logger = logging.getLogger(__name__)
 
 
-class Command(BaseCommand):
+class Command(BaseCommand, ConnManagerMixin):
     help = "Creates RTF and PDF translation files"
 
     def add_arguments(self, parser):
@@ -24,10 +24,6 @@ class Command(BaseCommand):
             default=None,
             help="The ID of the document translation to convert.",
         )
-
-    def reset_db_connections(self):
-        for conn in connections.all():
-            conn.close()
 
     def handle(self, *args, **options):
         """

@@ -4,7 +4,6 @@ from datetime import datetime
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.db.models import Q, F, Case, When
-from django.db import connections
 
 from la_metro_translations.models import (
     Document,
@@ -15,11 +14,12 @@ from la_metro_translations.models import (
     TranslationFile,
 )
 from la_metro_translations.services import MistralOCRService
+from la_metro_translations.management.commands.utils import ConnManagerMixin
 
 logger = logging.getLogger(__name__)
 
 
-class Command(BaseCommand):
+class Command(BaseCommand, ConnManagerMixin):
     """
     Extract text from documents that need content, and create/update related objects.
     If auto-approvals are enabled for extractions, chains into batch_translate
@@ -33,10 +33,6 @@ class Command(BaseCommand):
         "TranslationFiles. If auto-approvals are enabled for extractions, then this "
         "chains into batch_translate upon completion. "
     )
-
-    def reset_db_connections(self):
-        for conn in connections.all():
-            conn.close()
 
     def handle(self, **options):
         # Get any documents without content, or
