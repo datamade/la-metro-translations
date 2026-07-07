@@ -299,7 +299,7 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
         ("hyw", "Armenian (Western)"),
         ("zho-cn", "Chinese (Simplified)"),
         ("zho-tw", "Chinese (Traditional)"),
-        ("eng", "English"),
+        ("eng", "English (Accessibility)"),
         ("jpn", "Japanese"),
         ("kor", "Korean"),
         ("rus", "Russian"),
