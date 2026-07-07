@@ -97,18 +97,7 @@ class DocumentFilesView(APIView):
             agenda_text_map if entity_type == "event" else board_report_text_map
         )
 
-        lang_order = [
-            "eng",
-            "spa",
-            "zho-cn",
-            "zho-tw",
-            "kor",
-            "hye",
-            "hyw",
-            "vie",
-            "rus",
-            "jpn",
-        ]
+        lang_order = DocumentTranslation.get_language_priority()
         ordered = Case(
             *[
                 When(language=language, then=index)
