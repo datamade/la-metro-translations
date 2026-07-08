@@ -12,7 +12,7 @@ from mistralai.models.batchjobout import BatchJobOut
 
 logger = logging.getLogger(__name__)
 
-MAX_BATCH_SIZE_BYTES = 15_000_000  # 15MB Mistral batch API limit
+MAX_BATCH_SIZE_BYTES = 7_000_000  # 7MB Mistral batch API limit
 
 
 class BatchUtils:
