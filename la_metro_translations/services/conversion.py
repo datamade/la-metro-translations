@@ -1,8 +1,6 @@
-import base64
 import io
 import os
 import re
-import tempfile
 import pypandoc
 
 from weasyprint import HTML
@@ -89,37 +87,15 @@ class DocumentTranslationConverter:
             document_translation=self.doc_translation, format="pdf", file=django_file
         )
 
-    def _image_uri_to_tempfile(self, media_type: str, b64data: str) -> str:
-        """Decode a base64 image URI to a temporary file, returning its path."""
-        img_bytes = base64.b64decode(b64data)
-        tmp = tempfile.NamedTemporaryFile(suffix=f".{media_type}", delete=False)
-        tmp.write(img_bytes)
-        tmp.close()
-        return tmp.name
-
     def convert_to_rtf(self) -> TranslationFile:
         md_text = self.doc_translation.markdown or ""
-        temp_files = []
+
+        md_text = re.sub(r"!\[.*?\]\(data:image/[^)]+\)", "Image", md_text)
 
         language = self.doc_translation.language
         md_text = self._prepend_disclaimer(language, md_text)
 
         try:
-            # RTF embeds images as hex, but pandoc only handles file paths — not
-            # base64 data URIs. Decode each URI to a temp file so pandoc can read it.
-            pattern = r"!\[.*?\]\(data:image/(\w+);base64,([^)]+)\)"
-
-            def replace_with_tempfile(match):
-                media_type = match.group(1)
-                b64data = match.group(2)
-                path = self._image_uri_to_tempfile(media_type, b64data)
-                temp_files.append(path)
-                # Use empty alt text so pandoc doesn't emit the filename as a
-                # visible text paragraph below the embedded \pict block.
-                return f"![]({path})"
-
-            md_text = re.sub(pattern, replace_with_tempfile, md_text)
-
             output = pypandoc.convert_text(
                 md_text, to="rtf", format="markdown-yaml_metadata_block"
             )
@@ -130,12 +106,6 @@ class DocumentTranslationConverter:
             )
         except Exception as e:
             raise DocumentTranslationConverterError(f"Conversion failed: {e}")
-        finally:
-            for path in temp_files:
-                try:
-                    os.unlink(path)
-                except OSError:
-                    pass
 
         filename = self.doc_translation.document_content.document.title
 
