@@ -662,3 +662,4 @@ class LinkText(models.Model):
 
     class Meta:
         ordering = ["language"]
+        verbose_name_plural = "Download Link Translations"
