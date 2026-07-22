@@ -5,7 +5,7 @@
     "fields": {
       "language": "hye",
       "agenda_download_text": "Օրակարգը ներբեռնել (Արևելահայերեն)",
-      "board_report_download_text": "Download Board Report (Արևելահայերեն)"
+      "board_report_download_text": "Ներբեռնել խորհրդի զեկույցը (Արևելահայերեն)"
     }
   },
   {
@@ -14,7 +14,7 @@
     "fields": {
       "language": "hyw",
       "agenda_download_text": "Ներբեռնել Օրակարգը (Արևմտահայերէն)",
-      "board_report_download_text": "Download Board Report (Արևմտահայերէն)"
+      "board_report_download_text": "Ներբեռնել խորհուրդի տեղեկագիրը (Արևմտահայերէն)"
     }
   },
   {
@@ -23,7 +23,7 @@
     "fields": {
       "language": "zho-cn",
       "agenda_download_text": "下载议程 (汉语)",
-      "board_report_download_text": "Download Board Report (汉语)"
+      "board_report_download_text": "下载董事会报告 (汉语)"
     }
   },
   {
@@ -32,7 +32,7 @@
     "fields": {
       "language": "zho-tw",
       "agenda_download_text": "下載議程 (漢語)",
-      "board_report_download_text": "Download Board Report (漢語)"
+      "board_report_download_text": "下載董事會報告 (漢語)"
     }
   },
   {
@@ -50,7 +50,7 @@
     "fields": {
       "language": "jpn",
       "agenda_download_text": "議題をダウンロード (日本語)",
-      "board_report_download_text": "Download Board Report (日本語)"
+      "board_report_download_text": "取締役会報告書をダウンロード (日本語)"
     }
   },
   {
@@ -59,7 +59,7 @@
     "fields": {
       "language": "kor",
       "agenda_download_text": "의제 다운로드 (한국어)",
-      "board_report_download_text": "Download Board Report (한국어)"
+      "board_report_download_text": "이사회 보고서 다운로드 (한국어)"
     }
   },
   {
@@ -68,7 +68,7 @@
     "fields": {
       "language": "rus",
       "agenda_download_text": "Скачать повестку дня (Русский)",
-      "board_report_download_text": "Download Board Report (Русский)"
+      "board_report_download_text": "Скачать отчет совета директоров (Русский)"
     }
   },
   {
@@ -77,7 +77,7 @@
     "fields": {
       "language": "spa",
       "agenda_download_text": "Descargar Agenda (Español)",
-      "board_report_download_text": "Download Board Report (Español)"
+      "board_report_download_text": "Descargar informe del consejo (Español)"
     }
   },
   {
@@ -86,7 +86,7 @@
     "fields": {
       "language": "vie",
       "agenda_download_text": "Tải xuống Chương trình (tiếng Việt)",
-      "board_report_download_text": "Download Board Report (tiếng Việt)"
+      "board_report_download_text": "Tải xuống Báo Cáo của Hội Đồng Quản Trị (Tiếng Việt)"
     }
   }
 ]
