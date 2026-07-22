@@ -10,6 +10,7 @@ from la_metro_translations.models import (
     Document,
     DocumentContent,
     DocumentTranslation,
+    LinkText,
     TranslationFile,
 )
 from la_metro_translations.api.serializers import NotificationSerializer
@@ -60,6 +61,14 @@ class DocumentFilesView(APIView):
     Return urls for an entity's files and translations.
     """
 
+    def _get_link_text(self, entity_type, language):
+        link_text = LinkText.objects.get(language=language)
+        return (
+            link_text.agenda_download_text
+            if entity_type == "event"
+            else link_text.board_report_download_text
+        )
+
     def get(self, request):
         api_key = request.query_params.get("api_key")
         if api_key != settings.BOARDAGENDAS_API_KEY:
@@ -68,34 +77,6 @@ class DocumentFilesView(APIView):
 
         entity_type = request.query_params.get("entity_type")
         document_id = request.query_params.get("document_id")
-        agenda_text_map = {
-            "hye": "Օրակարգը ներբեռնել (Արևելահայերեն)",
-            "hyw": "Ներբեռնել Օրակարգը (Արևմտահայերէն)",
-            "zho-cn": "下载议程 (汉语)",
-            "zho-tw": "下載議程 (漢語)",
-            "eng": "Download Agenda (English - Accessible)",
-            "jpn": "議題をダウンロード (日本語)",
-            "kor": "의제 다운로드 (한국어)",
-            "rus": "Скачать повестку дня (Русский)",
-            "spa": "Descargar Agenda (Español)",
-            "vie": "Tải xuống Chương trình (tiếng Việt)",
-        }
-        board_report_text_map = {
-            "hye": "Download Board Report (Արևելահայերեն)",
-            "hyw": "Download Board Report (Արևմտահայերէն)",
-            "zho-cn": "Download Board Report (汉语)",
-            "zho-tw": "Download Board Report (漢語)",
-            "eng": "Download Board Report (English - Accessible)",
-            "jpn": "Download Board Report (日本語)",
-            "kor": "Download Board Report (한국어)",
-            "rus": "Download Board Report (Русский)",
-            "spa": "Download Board Report (Español)",
-            "vie": "Download Board Report (tiếng Việt)",
-        }
-
-        link_text_map = (
-            agenda_text_map if entity_type == "event" else board_report_text_map
-        )
 
         lang_order = DocumentTranslation.get_language_priority()
         ordered = Case(
@@ -125,7 +106,7 @@ class DocumentFilesView(APIView):
         for translation in content.translations.all():
             for file in translation.files.all():
                 link_details = {
-                    "link_text": link_text_map[translation.language],
+                    "link_text": self._get_link_text(entity_type, translation.language),
                     "url": file.get_file_url(),
                 }
                 file_links[file.format].append(link_details)

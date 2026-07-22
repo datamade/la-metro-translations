@@ -650,3 +650,16 @@ class Disclaimer(models.Model):
 
     class Meta:
         ordering = ["language"]
+
+
+class LinkText(models.Model):
+    language = models.CharField(choices=DocumentTranslation.LANGUAGE_CHOICES)
+    agenda_download_text = models.TextField()
+    board_report_download_text = models.TextField()
+
+    def __str__(self):
+        return f"{self.get_language_display()} [{self.language}] Link Text"
+
+    class Meta:
+        ordering = ["language"]
+        verbose_name_plural = "Download Link Translations"
