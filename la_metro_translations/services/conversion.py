@@ -87,10 +87,27 @@ class DocumentTranslationConverter:
             document_translation=self.doc_translation, format="pdf", file=django_file
         )
 
+    def insert_image_placeholder_text(self, text):
+
+        # For agendas, mark the first image as the Metro logo
+        entity_type = self.doc_translation.document_content.document.entity_type
+        if entity_type == "event":
+            return re.sub(
+                r"!\[(.*?)\]\(data:image/[^)]+\)",
+                lambda m: (
+                    "Metro Logo." if "img-0" in m.group(1).lower() else "Image removed."
+                ),
+                text,
+            )
+
+        # For board reports, just replace all images with placeholder
+        else:
+            return re.sub(r"!\[.*?\]\(data:image/[^)]+\)", "Image removed.", text)
+
     def convert_to_rtf(self) -> TranslationFile:
         md_text = self.doc_translation.markdown or ""
 
-        md_text = re.sub(r"!\[.*?\]\(data:image/[^)]+\)", "Image", md_text)
+        md_text = self.insert_image_placeholder_text(md_text)
 
         language = self.doc_translation.language
         md_text = self._prepend_disclaimer(language, md_text)
