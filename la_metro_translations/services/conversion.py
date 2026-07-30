@@ -89,20 +89,51 @@ class DocumentTranslationConverter:
 
     def insert_image_placeholder_text(self, text):
 
+        IMAGE_REMOVED_MAP = {
+            "eng": "Image removed",
+            "spa": "Imagen eliminada",
+            "zho-cn": "图片已删除",
+            "zho-tw": "圖片已刪除",
+            "kor": "이미지가 삭제됨",
+            "hye": "Նկարը հեռացվել է",
+            "hyw": "Նկարը ջնջվել է",
+            "vie": "Hình ảnh đã bị xóa",
+            "rus": "Изображение удалено",
+            "jpn": "画像が削除されました",
+        }
+
+        METRO_LOGO_MAP = {
+            "eng": "Metro logo removed",
+            "spa": "Imagen del logotipo de Metro",
+            "zho-cn": "Metro标志",
+            "zho-tw": "Metro標誌",
+            "kor": "Metro 로고 이미지",
+            "hye": "Metro-ի լոգոյի պատկեր",
+            "hyw": "Մեթրոյի լոկոյի պատկեր",
+            "vie": "Hình ảnh logo của Metro",
+            "rus": "Изображение логотипа Метро",
+            "jpn": "メトロのロゴ画像",
+        }
+
         # For agendas, mark the first image as the Metro logo
+        language = str(self.doc_translation.language)
+        image_removed_text = IMAGE_REMOVED_MAP[language]
+        metro_logo_text = METRO_LOGO_MAP[language]
         entity_type = self.doc_translation.document_content.document.entity_type
         if entity_type == "event":
             return re.sub(
                 r"!\[(.*?)\]\(data:image/[^)]+\)",
                 lambda m: (
-                    "Metro Logo." if "img-0" in m.group(1).lower() else "Image removed."
+                    metro_logo_text
+                    if "img-0" in m.group(1).lower()
+                    else image_removed_text
                 ),
                 text,
             )
 
         # For board reports, just replace all images with placeholder
         else:
-            return re.sub(r"!\[.*?\]\(data:image/[^)]+\)", "Image removed.", text)
+            return re.sub(r"!\[.*?\]\(data:image/[^)]+\)", image_removed_text, text)
 
     def convert_to_rtf(self) -> TranslationFile:
         md_text = self.doc_translation.markdown or ""
