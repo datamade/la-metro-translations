@@ -146,43 +146,45 @@ class MistralTranslationService(TranslationService):
         all_content_images = {}
         timeout_hours = 23
 
-        # Create batch entries
+        # Create batch entries, set up result map
         entries = []
+        result_map = {}
         for content in contents:
             modded_text, images_cache = MistralTranslationService.cache_images(
                 source_text=content.markdown
             )
             related_doc = content.document
             doc_custom_id = f"{related_doc.document_type}:{related_doc.document_id}"
+
+            result_map[doc_custom_id] = {"chunks": {}}
             all_content_images[doc_custom_id] = images_cache
 
-            # TODO: loop through all the chunks and make batches for all of them
-            # and name them in way so they can be stitched back together
-            # content_chunks = MistralTranslationService.chunk_single_documents(
-            #     modded_text
-            # )
-
-            entries.append(
-                {
-                    # ex. "bill_version:<some-uid>"
-                    "custom_id": doc_custom_id,
-                    "body": {
-                        "messages": [
-                            {
-                                "role": "system",
-                                "content": SYSTEM_MESSAGE,
-                            },
-                            {
-                                "role": "user",
-                                "content": (
-                                    "Translate the following text to "
-                                    f"{language}: {modded_text}"
-                                ),
-                            },
-                        ],
-                    },
-                }
+            content_chunks = MistralTranslationService.chunk_single_documents(
+                modded_text
             )
+
+            for i, chunk in enumerate(content_chunks):
+                entries.append(
+                    {
+                        # ex. "bill_version:<some-uid>:chunk_1"
+                        "custom_id": doc_custom_id + f":chunk_{i}",
+                        "body": {
+                            "messages": [
+                                {
+                                    "role": "system",
+                                    "content": SYSTEM_MESSAGE,
+                                },
+                                {
+                                    "role": "user",
+                                    "content": (
+                                        "Translate the following text to "
+                                        f"{language}: {chunk}"
+                                    ),
+                                },
+                            ],
+                        },
+                    }
+                )
 
         # Start batch job
         created_job = BatchUtils.start_batch_job(
@@ -200,32 +202,49 @@ class MistralTranslationService(TranslationService):
         if not response:
             return
 
-        # TODO: stitch the content chunks back together
-
-        # Reinsert images into each translation
+        # Sort the response into the result_map for further processing
         for line in response.iter_lines():
             translation_response = json.loads(line)
+            translation_response_id = translation_response["custom_id"]
 
-            document_type = translation_response["custom_id"].split(":")[0]
-            document_id = translation_response["custom_id"].split(":")[1]
+            raw_document_type = translation_response_id.split(":")[0]
+            raw_document_id = translation_response_id.split(":")[1]
+            document_chunk_label = translation_response_id.split(":")[2]
+            num_chunk = document_chunk_label.replace("chunk_", "")
 
             try:
                 response_body = translation_response["response"]["body"]
-                translated_text = response_body["choices"][0]["message"]["content"]
+                translated_chunk = response_body["choices"][0]["message"]["content"]
             except (KeyError, IndexError) as e:
                 logger.warning(
                     f"Error parsing batch translation response for "
-                    f"{document_type}:{document_id}: {e}. Skipping..."
+                    f"{translation_response_id}: {e}. Skipping..."
                 )
                 continue
 
+            result_map[f"{raw_document_type}:{raw_document_id}"]["chunks"].update(
+                {num_chunk: translated_chunk}
+            )
+
+        # Rejoin chunked translations, and reinsert images into each translation
+        for processed_doc_id in list(result_map.keys()):
+            curr_doc = result_map[processed_doc_id]
+            document_type = processed_doc_id.split(":")[0]
+            document_id = processed_doc_id.split(":")[1]
+
+            # Stitch chunks back together in order
+            chunk_indices = list(curr_doc["chunks"].keys())
+            chunk_indices.sort()
+            sorted_chunks = [curr_doc["chunks"][i] for i in chunk_indices]
+            full_translation = "".join(sorted_chunks)
+
             # Match this translation with its images using a key with
             # the same format as the doc_custom_id set up earlier
-            matched_images = all_content_images[f"{document_type}:{document_id}"]
-
+            matched_images = all_content_images[processed_doc_id]
             translation_with_images = MistralTranslationService.reinsert_cached_images(
-                translated_text, matched_images, language, document_id
+                full_translation, matched_images, language, document_id
             )
+
             translation = {
                 "document_type": document_type,
                 "document_id": document_id,
@@ -281,16 +300,21 @@ class MistralTranslationService(TranslationService):
         return text_with_images
 
     @staticmethod
-    def chunk_single_documents(content_str: str):
+    def chunk_single_documents(content_str: str) -> List[str]:
         """
         Chunks a document's content into groups of pages.
 
         Intended to avoid coming up against Mistral's max token limit
         for a single document, and ensure the full doc gets translated.
+
+        Each item in the resulting list is a string formed from the grouped pages.
+
+        TODO: implement this into the single translation method
+        once that starts getting used
         """
 
         # Split content string into list of discreet pages with page markers
-        pattern = r"[\s\S]*?\n\nEnd of Page \d+\n\n"
+        pattern = r"[\s\S]*?End of Page \d+"
         split_pages = re.findall(pattern, content_str)
         total_num_pages = len(split_pages)
 
@@ -319,9 +343,8 @@ class MistralTranslationService(TranslationService):
 
             grouped_pages.append(joined_group)
 
-        # TODO: remove when done with dev
-        if len(grouped_pages) > 1:
-            logger.info("CHUNKING CONTENT!!")
+        # Remove empty elements
+        grouped_pages = [g for g in grouped_pages if g]
         return grouped_pages
 
     @staticmethod
