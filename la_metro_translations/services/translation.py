@@ -210,7 +210,7 @@ class MistralTranslationService(TranslationService):
             raw_document_type = translation_response_id.split(":")[0]
             raw_document_id = translation_response_id.split(":")[1]
             document_chunk_label = translation_response_id.split(":")[2]
-            num_chunk = document_chunk_label.replace("chunk_", "")
+            num_chunk = int(document_chunk_label.replace("chunk_", ""))
 
             try:
                 response_body = translation_response["response"]["body"]
