@@ -156,6 +156,12 @@ class MistralTranslationService(TranslationService):
             doc_custom_id = f"{related_doc.document_type}:{related_doc.document_id}"
             all_content_images[doc_custom_id] = images_cache
 
+            # TODO: loop through all the chunks and make batches for all of them
+            # and name them in way so they can be stitched back together
+            # content_chunks = MistralTranslationService.chunk_single_documents(
+            #     modded_text
+            # )
+
             entries.append(
                 {
                     # ex. "bill_version:<some-uid>"
@@ -193,6 +199,8 @@ class MistralTranslationService(TranslationService):
         )
         if not response:
             return
+
+        # TODO: stitch the content chunks back together
 
         # Reinsert images into each translation
         for line in response.iter_lines():
@@ -271,6 +279,50 @@ class MistralTranslationService(TranslationService):
                 text_with_images = text_with_images.replace(f"{label}()", full_image)
 
         return text_with_images
+
+    @staticmethod
+    def chunk_single_documents(content_str: str):
+        """
+        Chunks a document's content into groups of pages.
+
+        Intended to avoid coming up against Mistral's max token limit
+        for a single document, and ensure the full doc gets translated.
+        """
+
+        # Split content string into list of discreet pages with page markers
+        pattern = r"[\s\S]*?\n\nEnd of Page \d+\n\n"
+        split_pages = re.findall(pattern, content_str)
+        total_num_pages = len(split_pages)
+
+        # Create chunks of pages as a list of joined strings
+        chunk_size = 5
+        grouped_pages = []
+        leftover_chunk = ""
+        for i in range(0, total_num_pages, chunk_size):
+            stop_page_index = i + chunk_size
+            curr_group = split_pages[i:stop_page_index]
+
+            if leftover_chunk:
+                curr_group = [leftover_chunk] + curr_group
+                leftover_chunk = ""
+
+            joined_group = "".join(curr_group)
+
+            # If there are more pages past the current group,
+            # stop the chunk at the last header found anywhere in the current chunk
+            # to prevent us from cutting the chunk mid sentence.
+            if stop_page_index < total_num_pages:
+                parts = re.split(r"(?=^### )", joined_group, flags=re.MULTILINE)
+                if len(parts) > 1:
+                    joined_group = "".join(parts[:-1])
+                    leftover_chunk = parts[-1]
+
+            grouped_pages.append(joined_group)
+
+        # TODO: remove when done with dev
+        if len(grouped_pages) > 1:
+            logger.info("CHUNKING CONTENT!!")
+        return grouped_pages
 
     @staticmethod
     def metered_batch_translate(
