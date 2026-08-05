@@ -1,8 +1,6 @@
-import base64
 import io
 import os
 import re
-import tempfile
 import pypandoc
 
 from weasyprint import HTML
@@ -89,37 +87,63 @@ class DocumentTranslationConverter:
             document_translation=self.doc_translation, format="pdf", file=django_file
         )
 
-    def _image_uri_to_tempfile(self, media_type: str, b64data: str) -> str:
-        """Decode a base64 image URI to a temporary file, returning its path."""
-        img_bytes = base64.b64decode(b64data)
-        tmp = tempfile.NamedTemporaryFile(suffix=f".{media_type}", delete=False)
-        tmp.write(img_bytes)
-        tmp.close()
-        return tmp.name
+    def insert_image_placeholder_text(self, text):
+
+        IMAGE_REMOVED_MAP = {
+            "eng": "Image removed",
+            "spa": "Imagen eliminada",
+            "zho-cn": "图片已删除",
+            "zho-tw": "圖片已刪除",
+            "kor": "이미지가 삭제됨",
+            "hye": "Նկարը հեռացվել է",
+            "hyw": "Նկարը ջնջվել է",
+            "vie": "Hình ảnh đã bị xóa",
+            "rus": "Изображение удалено",
+            "jpn": "画像が削除されました",
+        }
+
+        METRO_LOGO_MAP = {
+            "eng": "Metro logo removed",
+            "spa": "Imagen del logotipo de Metro",
+            "zho-cn": "Metro标志",
+            "zho-tw": "Metro標誌",
+            "kor": "Metro 로고 이미지",
+            "hye": "Metro-ի լոգոյի պատկեր",
+            "hyw": "Մեթրոյի լոկոյի պատկեր",
+            "vie": "Hình ảnh logo của Metro",
+            "rus": "Изображение логотипа Метро",
+            "jpn": "メトロのロゴ画像",
+        }
+
+        # For agendas, mark the first image as the Metro logo
+        language = str(self.doc_translation.language)
+        image_removed_text = IMAGE_REMOVED_MAP[language]
+        metro_logo_text = METRO_LOGO_MAP[language]
+        entity_type = self.doc_translation.document_content.document.entity_type
+        if entity_type == "event":
+            return re.sub(
+                r"!\[(.*?)\]\(data:image/[^)]+\)",
+                lambda m: (
+                    metro_logo_text
+                    if "img-0" in m.group(1).lower()
+                    else image_removed_text
+                ),
+                text,
+            )
+
+        # For board reports, just replace all images with placeholder
+        else:
+            return re.sub(r"!\[.*?\]\(data:image/[^)]+\)", image_removed_text, text)
 
     def convert_to_rtf(self) -> TranslationFile:
         md_text = self.doc_translation.markdown or ""
-        temp_files = []
+
+        md_text = self.insert_image_placeholder_text(md_text)
 
         language = self.doc_translation.language
         md_text = self._prepend_disclaimer(language, md_text)
 
         try:
-            # RTF embeds images as hex, but pandoc only handles file paths — not
-            # base64 data URIs. Decode each URI to a temp file so pandoc can read it.
-            pattern = r"!\[.*?\]\(data:image/(\w+);base64,([^)]+)\)"
-
-            def replace_with_tempfile(match):
-                media_type = match.group(1)
-                b64data = match.group(2)
-                path = self._image_uri_to_tempfile(media_type, b64data)
-                temp_files.append(path)
-                # Use empty alt text so pandoc doesn't emit the filename as a
-                # visible text paragraph below the embedded \pict block.
-                return f"![]({path})"
-
-            md_text = re.sub(pattern, replace_with_tempfile, md_text)
-
             output = pypandoc.convert_text(
                 md_text, to="rtf", format="markdown-yaml_metadata_block"
             )
@@ -130,12 +154,6 @@ class DocumentTranslationConverter:
             )
         except Exception as e:
             raise DocumentTranslationConverterError(f"Conversion failed: {e}")
-        finally:
-            for path in temp_files:
-                try:
-                    os.unlink(path)
-                except OSError:
-                    pass
 
         filename = self.doc_translation.document_content.document.title
 
