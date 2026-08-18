@@ -329,6 +329,17 @@ class MistralTranslationService(TranslationService):
         # Split content string into list of discreet pages with page markers
         pattern = r"[\s\S]*?End of Page \d+"
         split_pages = re.findall(pattern, content_str)
+
+        if not split_pages:
+            # Treat the whole string as a single page if there aren't any page markers
+            split_pages = [content_str]
+        else:
+            # Add any valid content after the last page marker as an extra page.
+            # Content is not be valid if it's all just whitespace.
+            trailing_content = content_str[sum(len(page) for page in split_pages) :]
+            if trailing_content.rstrip():
+                split_pages.append(trailing_content)
+
         total_num_pages = len(split_pages)
 
         # Create chunks of pages as a list of joined strings
