@@ -206,6 +206,43 @@ class TestBatchTranslateCommand:
         expected_markdown = "".join(f"chunk-{i}-" for i in range(11))
         assert translations[0]["markdown"] == expected_markdown
 
+    def test_batch_translate_skips_document_missing_chunks(
+        self, document_content, make_document_pages
+    ):
+        """
+        Check that we don't create translations when our translation service doesn't
+        return all chunks from a single document, instead of creating an incomplete one.
+        """
+        document_content.markdown = make_document_pages(10)
+        document_content.save()
+
+        doc = document_content.document
+        doc_custom_id = f"{doc.document_type}:{doc.document_id}"
+
+        # Expecting 2 chunks from 20 pages (5 pages per chunk), but only return one
+        response_lines = [
+            json.dumps(
+                {
+                    "custom_id": f"{doc_custom_id}:chunk_0",
+                    "response": {
+                        "body": {"choices": [{"message": {"content": "chunk-0-"}}]}
+                    },
+                }
+            )
+        ]
+
+        mock_response = MagicMock()
+        mock_response.iter_lines.return_value = response_lines
+
+        with patch(PATCH_START_BATCH_JOB), patch(
+            PATCH_CHECK_BATCH_JOB, return_value=mock_response
+        ):
+            translations = list(
+                MistralTranslationService.batch_translate([document_content], "Spanish")
+            )
+
+        assert translations == []
+
 
 @pytest.mark.django_db
 class TestBatchExtractCommand:
