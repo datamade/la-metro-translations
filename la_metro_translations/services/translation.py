@@ -335,10 +335,10 @@ class MistralTranslationService(TranslationService):
             split_pages = [content_str]
         else:
             # Add any valid content after the last page marker as an extra page.
-            # Content is not be valid if it's all just whitespace.
+            # Content is not valid if it's all just whitespace.
             trailing_content = content_str[sum(len(page) for page in split_pages) :]
-            if trailing_content.rstrip():
-                split_pages.append(trailing_content)
+            if cleaned_trail := trailing_content.rstrip():
+                split_pages.append(cleaned_trail)
 
         total_num_pages = len(split_pages)
 
