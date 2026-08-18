@@ -156,12 +156,15 @@ class MistralTranslationService(TranslationService):
             related_doc = content.document
             doc_custom_id = f"{related_doc.document_type}:{related_doc.document_id}"
 
-            result_map[doc_custom_id] = {"chunks": {}}
             all_content_images[doc_custom_id] = images_cache
 
             content_chunks = MistralTranslationService.chunk_single_documents(
                 modded_text
             )
+            result_map[doc_custom_id] = {
+                "chunks": {},
+                "num_chunks": len(content_chunks),
+            }
 
             for i, chunk in enumerate(content_chunks):
                 entries.append(
@@ -210,7 +213,7 @@ class MistralTranslationService(TranslationService):
             raw_document_type = translation_response_id.split(":")[0]
             raw_document_id = translation_response_id.split(":")[1]
             document_chunk_label = translation_response_id.split(":")[2]
-            num_chunk = int(document_chunk_label.replace("chunk_", ""))
+            chunk_index = int(document_chunk_label.replace("chunk_", ""))
 
             try:
                 response_body = translation_response["response"]["body"]
@@ -223,7 +226,7 @@ class MistralTranslationService(TranslationService):
                 continue
 
             result_map[f"{raw_document_type}:{raw_document_id}"]["chunks"].update(
-                {num_chunk: translated_chunk}
+                {chunk_index: translated_chunk}
             )
 
         # Rejoin chunked translations, and reinsert images into each translation
@@ -231,9 +234,19 @@ class MistralTranslationService(TranslationService):
             curr_doc = result_map[processed_doc_id]
             document_type = processed_doc_id.split(":")[0]
             document_id = processed_doc_id.split(":")[1]
+            chunk_indices = list(curr_doc["chunks"].keys())
+
+            # Toss out document translations that didn't return all chunks
+            if len(chunk_indices) != curr_doc["num_chunks"]:
+                logger.warning(
+                    f"Document with doc_custom_id='{processed_doc_id}' "
+                    f"expected {curr_doc['num_chunks']} chunks back, "
+                    f"but got {len(chunk_indices)}. "
+                    "Refraining from creating an incomplete translation..."
+                )
+                continue
 
             # Stitch chunks back together in order
-            chunk_indices = list(curr_doc["chunks"].keys())
             chunk_indices.sort()
             sorted_chunks = [curr_doc["chunks"][i] for i in chunk_indices]
             full_translation = "".join(sorted_chunks)
