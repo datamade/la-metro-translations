@@ -99,7 +99,6 @@ class MistralTranslationService(TranslationService):
                         ),
                     },
                 ],
-                temperature=0,
             )
         except SDKError as e:
             logger.warning(
@@ -186,7 +185,6 @@ class MistralTranslationService(TranslationService):
                                     ),
                                 },
                             ],
-                            "temperature": 0,
                         },
                     }
                 )
