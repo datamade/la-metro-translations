@@ -1,7 +1,8 @@
 import itertools
+import json
 import pytest
 from datetime import datetime, timedelta
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from django.core.management import call_command as run_command
 
@@ -17,6 +18,7 @@ from la_metro_translations.models import (
     DocumentTranslation,
     TranslationFile,
 )
+from la_metro_translations.services.translation import MistralTranslationService
 
 PATCH_OCR = (
     "la_metro_translations.management.commands.batch_extract"
@@ -43,6 +45,12 @@ PATCH_CONVERT_RESET_DB = (
 
 PATCH_TRANSLATE_SERVICE = (
     "la_metro_translations.management.commands.batch_translate.get_translation_service"
+)
+PATCH_START_BATCH_JOB = (
+    "la_metro_translations.services.translation.BatchUtils.start_batch_job"
+)
+PATCH_CHECK_BATCH_JOB = (
+    "la_metro_translations.services.translation.BatchUtils.check_batch_job"
 )
 
 
@@ -133,6 +141,107 @@ class TestBatchTranslateCommand:
             document_content=document_content, language="spa"
         )
         assert translation.approval_status == "waiting"
+
+    def test_chunk_single_documents_groups_pages_by_chunk_size(
+        self, make_document_pages
+    ):
+        content = make_document_pages(55)
+
+        chunks = MistralTranslationService.chunk_single_documents(content)
+
+        assert len(chunks) == 11
+        for chunk in chunks:
+            assert chunk.count("End of Page") == 5
+
+    def test_chunk_single_documents_returns_single_chunk_for_small_document(
+        self, make_document_pages
+    ):
+        content = make_document_pages(3)
+
+        chunks = MistralTranslationService.chunk_single_documents(content)
+
+        assert len(chunks) == 1
+        assert chunks[0].count("End of Page") == 3
+
+    def test_batch_translate_stitches_chunks_in_numeric_order(
+        self, document_content, make_document_pages
+    ):
+        """
+        Check that chunks are stitched back in actual numeric order (0, 1, 2, ..., 10)
+        instead of faux-alphabetized ("0", "1", "10", "2", ...).
+
+        This case would only happen if a document produces more than 10 chunks.
+        """
+        document_content.markdown = make_document_pages(55)
+        document_content.save()
+
+        doc = document_content.document
+        doc_custom_id = f"{doc.document_type}:{doc.document_id}"
+
+        # Deliberately out of numeric order
+        chunk_order = [0, 1, 10, 2, 3, 4, 5, 6, 7, 8, 9]
+        response_lines = [
+            json.dumps(
+                {
+                    "custom_id": f"{doc_custom_id}:chunk_{i}",
+                    "response": {
+                        "body": {"choices": [{"message": {"content": f"chunk-{i}-"}}]}
+                    },
+                }
+            )
+            for i in chunk_order
+        ]
+
+        mock_response = MagicMock()
+        mock_response.iter_lines.return_value = response_lines
+
+        with patch(PATCH_START_BATCH_JOB), patch(
+            PATCH_CHECK_BATCH_JOB, return_value=mock_response
+        ):
+            translations = list(
+                MistralTranslationService.batch_translate([document_content], "Spanish")
+            )
+
+        assert len(translations) == 1
+        expected_markdown = "".join(f"chunk-{i}-" for i in range(11))
+        assert translations[0]["markdown"] == expected_markdown
+
+    def test_batch_translate_skips_document_missing_chunks(
+        self, document_content, make_document_pages
+    ):
+        """
+        Check that we don't create translations when our translation service doesn't
+        return all chunks from a single document, instead of creating an incomplete one.
+        """
+        document_content.markdown = make_document_pages(10)
+        document_content.save()
+
+        doc = document_content.document
+        doc_custom_id = f"{doc.document_type}:{doc.document_id}"
+
+        # Expecting 2 chunks from 20 pages (5 pages per chunk), but only return one
+        response_lines = [
+            json.dumps(
+                {
+                    "custom_id": f"{doc_custom_id}:chunk_0",
+                    "response": {
+                        "body": {"choices": [{"message": {"content": "chunk-0-"}}]}
+                    },
+                }
+            )
+        ]
+
+        mock_response = MagicMock()
+        mock_response.iter_lines.return_value = response_lines
+
+        with patch(PATCH_START_BATCH_JOB), patch(
+            PATCH_CHECK_BATCH_JOB, return_value=mock_response
+        ):
+            translations = list(
+                MistralTranslationService.batch_translate([document_content], "Spanish")
+            )
+
+        assert translations == []
 
 
 @pytest.mark.django_db

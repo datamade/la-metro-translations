@@ -163,3 +163,18 @@ def wagtail_user_client(client, wagtail_user):
     user, plaintext_password = wagtail_user
     client.login(username=user.username, password=plaintext_password)
     return client
+
+
+@pytest.fixture
+def make_document_pages():
+    """Builds fake OCR'd document content out of the given number of "pages",
+    each ending in the "End of Page N" marker that chunk_single_documents
+    splits on."""
+
+    def _make(num_pages):
+        return "".join(
+            f"Some text body for page {i}.\n\nEnd of Page {i}\n\n"
+            for i in range(1, num_pages + 1)
+        )
+
+    return _make
