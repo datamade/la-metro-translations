@@ -106,6 +106,7 @@ class DocumentFilesView(APIView):
         for translation in content.translations.all():
             for file in translation.files.all():
                 link_details = {
+                    "language": translation.get_language_display(),
                     "link_text": self._get_link_text(entity_type, translation.language),
                     "url": file.get_file_url(),
                 }
