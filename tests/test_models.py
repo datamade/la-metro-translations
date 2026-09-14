@@ -1,6 +1,8 @@
 import pytest
 from unittest.mock import call, patch
 
+from django.db import IntegrityError
+
 from conftest import (
     DocumentContentFactory,
     DocumentFactory,
@@ -8,7 +10,7 @@ from conftest import (
     ExtractionConfigFactory,
     TranslationConfigFactory,
 )
-from la_metro_translations.models import DocumentContent
+from la_metro_translations.models import DocumentContent, LinkText
 
 PATCH_GET_BACKEND = "la_metro_translations.models.get_backend"
 
@@ -285,3 +287,27 @@ class TestTranslationConfigSave:
         waiting.refresh_from_db()
         assert waiting.approval_status == "waiting"
         mock_call_command().start_job.assert_not_called()
+
+
+@pytest.mark.django_db
+class TestLinkTextLanguageUnique:
+    """
+    Each language may have only one download link text configuration, since
+    DocumentFilesView looks up link text with LinkText.objects.get(language=...).
+    """
+
+    def test_language_field_is_unique(self):
+        assert LinkText._meta.get_field("language").unique is True
+
+    def test_duplicate_language_rejected(self):
+        LinkText.objects.create(
+            language="spa",
+            agenda_download_text="Download agenda (Spanish)",
+            board_report_download_text="Download board report (Spanish)",
+        )
+        with pytest.raises(IntegrityError):
+            LinkText.objects.create(
+                language="spa",
+                agenda_download_text="Duplicate agenda text",
+                board_report_download_text="Duplicate board report text",
+            )
