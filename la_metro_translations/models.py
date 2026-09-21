@@ -423,6 +423,19 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
 
     file_formats_display.short_description = "File Formats"
 
+    def missing_languages(self):
+
+        existing_translations = list(
+            self.translations.values_list("language", flat=True)
+        )
+        missing = [
+            display
+            for (code, display) in DocumentTranslation.LANGUAGE_CHOICES
+            if code not in existing_translations
+        ]
+
+        return missing
+
     @staticmethod
     def get_language_priority():
         return [
