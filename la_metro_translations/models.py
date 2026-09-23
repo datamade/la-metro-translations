@@ -4,7 +4,7 @@ from django.conf import settings
 from la_metro_translations.backends import get_backend
 from django.db import models
 from django.urls import reverse
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 from django.utils.formats import date_format
 
@@ -278,6 +278,24 @@ class DocumentContent(AdminDisplayMixin, models.Model):
 
     file_formats_display.short_description = "File Formats"
 
+    def missing_translations(self):
+
+        existing_translations = list(
+            self.translations.values_list("language", flat=True)
+        )
+        missing = [
+            display
+            for (code, display) in DocumentTranslation.LANGUAGE_CHOICES
+            if code not in existing_translations
+        ]
+
+        print(missing)
+
+        return format_html(
+            "<ul>{}</ul>",
+            format_html_join("\n", "<li>{}</li>", ((lg,) for lg in missing)),
+        )
+
 
 class DocumentTranslation(AdminDisplayMixin, models.Model):
     """
@@ -422,19 +440,6 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
         )
 
     file_formats_display.short_description = "File Formats"
-
-    def missing_languages(self):
-
-        existing_translations = list(
-            self.translations.values_list("language", flat=True)
-        )
-        missing = [
-            display
-            for (code, display) in DocumentTranslation.LANGUAGE_CHOICES
-            if code not in existing_translations
-        ]
-
-        return missing
 
     @staticmethod
     def get_language_priority():

@@ -253,6 +253,7 @@ class DocumentContentViewSet(ModelViewSet):
             ],
             heading="Document Translations",
         ),
+        PropertyPanel("missing_translations", heading="Missing translations"),
     ]
 
 
