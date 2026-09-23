@@ -278,6 +278,13 @@ class DocumentContent(AdminDisplayMixin, models.Model):
 
     file_formats_display.short_description = "File Formats"
 
+    @classmethod
+    def _format_missing_list(cls, list):
+        return format_html(
+            "<ul>{}</ul>",
+            format_html_join("\n", "<li>{}</li>", ((item,) for item in list)),
+        )
+
     def missing_translations(self):
 
         existing_translations = list(
