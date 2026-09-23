@@ -289,7 +289,8 @@ class DocumentContent(AdminDisplayMixin, models.Model):
             if code not in existing_translations
         ]
 
-        print(missing)
+        if not missing:
+            return "This document has translations in all supported languages."
 
         return format_html(
             "<ul>{}</ul>",
