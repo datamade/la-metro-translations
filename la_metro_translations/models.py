@@ -653,7 +653,9 @@ class Disclaimer(models.Model):
 
 
 class LinkText(models.Model):
-    language = models.CharField(choices=DocumentTranslation.LANGUAGE_CHOICES)
+    language = models.CharField(
+        choices=DocumentTranslation.LANGUAGE_CHOICES, unique=True
+    )
     agenda_download_text = models.TextField()
     board_report_download_text = models.TextField()
 
