@@ -291,6 +291,8 @@ class TestTranslationConfigSave:
 @pytest.mark.django_db
 class TestDocumentContentMissingTranslations:
 
+    CODES, DISPLAY = zip(*DocumentTranslation.LANGUAGE_CHOICES)
+
     def test_missing_translations_html_formatting(self):
         "Return correct HTML for a list of missing languages."
         test_list = ["English", "Spanish"]
@@ -299,16 +301,16 @@ class TestDocumentContentMissingTranslations:
 
     def test_missing_translations_show_all_when_no_translations(self, document_content):
         "Return list of every language when there are no translations."
-        lgs = [display for (_, display) in DocumentTranslation.LANGUAGE_CHOICES]
+
         assert (
             document_content.missing_translations()
-            == DocumentContent._format_missing_list(lgs)
+            == DocumentContent._format_missing_list(self.DISPLAY)
         )
 
     def test_missing_translations_when_all_languages_covered(self, document_content):
         "Return message when there are no missing translations."
-        codes = [code for (code, _) in DocumentTranslation.LANGUAGE_CHOICES]
-        for code in codes:
+
+        for code in self.CODES:
             DocumentTranslationFactory(document_content=document_content, language=code)
 
         assert (
@@ -323,12 +325,10 @@ class TestDocumentContentMissingTranslations:
         Return list of only the missing languages when some translations exist.
         DocumentTranslation is built using codes, missing language list uses display value.
         """
-        codes = [code for (code, _) in DocumentTranslation.LANGUAGE_CHOICES]
-        lgs = [display for (_, display) in DocumentTranslation.LANGUAGE_CHOICES]
 
         # get complementary slices
-        existing = codes[2:]
-        missing = lgs[:2]
+        existing = self.CODES[2:]
+        missing = self.DISPLAY[:2]
 
         for code in existing:
             DocumentTranslationFactory(document_content=document_content, language=code)
