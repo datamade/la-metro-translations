@@ -149,6 +149,14 @@ class DocumentViewSet(ModelViewSet):
             ],
             heading="Document Translations",
         ),
+        RelatedObjectsPanel(
+            "la_metro_translations.DocumentContent",
+            "document",
+            panels=[
+                PropertyPanel("missing_translations"),
+            ],
+            heading="Missing translations",
+        ),
     ]
 
 
