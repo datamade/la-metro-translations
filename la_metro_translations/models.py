@@ -300,8 +300,8 @@ class DocumentContent(AdminDisplayMixin, models.Model):
             return "This document has translations in all supported languages."
 
         return format_html(
-            "<ul>{}</ul>",
-            format_html_join("\n", "<li>{}</li>", ((lg,) for lg in missing)),
+            "<ul class='missing-list'>{}</ul>",
+            format_html_join("\n", "<li><p>{}</p></li>", ((lg,) for lg in missing)),
         )
 
 
