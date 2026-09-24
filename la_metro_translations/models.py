@@ -281,8 +281,8 @@ class DocumentContent(AdminDisplayMixin, models.Model):
     @classmethod
     def _format_missing_list(cls, list):
         return format_html(
-            "<ul>{}</ul>",
-            format_html_join("\n", "<li>{}</li>", ((item,) for item in list)),
+            "<ul class='missing-list'>{}</ul>",
+            format_html_join("\n", "<li><p>{}</p></li>", ((item,) for item in list)),
         )
 
     def missing_translations(self):
@@ -299,10 +299,7 @@ class DocumentContent(AdminDisplayMixin, models.Model):
         if not missing:
             return "This document has translations in all supported languages."
 
-        return format_html(
-            "<ul class='missing-list'>{}</ul>",
-            format_html_join("\n", "<li><p>{}</p></li>", ((lg,) for lg in missing)),
-        )
+        return self._format_missing_list(missing)
 
 
 class DocumentTranslation(AdminDisplayMixin, models.Model):
