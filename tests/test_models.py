@@ -296,7 +296,7 @@ class TestDocumentContentMissingTranslations:
     def test_missing_translations_html_formatting(self):
         "Return correct HTML for a list of missing languages."
         test_list = ["English", "Spanish"]
-        expected = "<ul><li>English</li>\n<li>Spanish</li></ul>"
+        expected = "<ul class='missing-list'><li><p>English</p></li>\n<li><p>Spanish</p></li></ul>"
         assert DocumentContent._format_missing_list(test_list) == expected
 
     def test_missing_translations_show_all_when_no_translations(self, document_content):
