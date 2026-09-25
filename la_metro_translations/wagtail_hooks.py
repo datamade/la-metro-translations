@@ -8,6 +8,8 @@ from wagtail.permissions import ModelPermissionPolicy
 from wagtail.snippets.views.snippets import IndexView, SnippetViewSet
 from wagtail.snippets.models import register_snippet
 
+from django.utils.html import format_html
+from django.templatetags.static import static
 from django_filters import CharFilter, ChoiceFilter
 from django.urls import path, reverse
 from .views import PromptView
@@ -21,6 +23,13 @@ from .models import (
     LinkText,
 )
 from .panels import PropertyPanel, RelatedObjectsPanel
+
+
+@hooks.register("insert_global_admin_css")
+def global_admin_css():
+    return format_html(
+        '<link rel="stylesheet" href="{}">', static("css/la_metro_translations.css")
+    )
 
 
 class ReadEditOnlyPermissionPolicy(ModelPermissionPolicy):
@@ -140,6 +149,14 @@ class DocumentViewSet(ModelViewSet):
             ],
             heading="Document Translations",
         ),
+        RelatedObjectsPanel(
+            "la_metro_translations.DocumentContent",
+            "document",
+            panels=[
+                PropertyPanel("missing_translations"),
+            ],
+            heading="Missing translations",
+        ),
     ]
 
 
@@ -253,6 +270,7 @@ class DocumentContentViewSet(ModelViewSet):
             ],
             heading="Document Translations",
         ),
+        PropertyPanel("missing_translations", heading="Missing translations"),
     ]
 
 

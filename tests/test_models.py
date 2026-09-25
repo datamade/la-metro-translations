@@ -8,7 +8,8 @@ from conftest import (
     ExtractionConfigFactory,
     TranslationConfigFactory,
 )
-from la_metro_translations.models import DocumentContent
+
+from la_metro_translations.models import DocumentContent, DocumentTranslation
 
 PATCH_GET_BACKEND = "la_metro_translations.models.get_backend"
 
@@ -285,3 +286,54 @@ class TestTranslationConfigSave:
         waiting.refresh_from_db()
         assert waiting.approval_status == "waiting"
         mock_call_command().start_job.assert_not_called()
+
+
+@pytest.mark.django_db
+class TestDocumentContentMissingTranslations:
+
+    CODES, DISPLAY = zip(*DocumentTranslation.LANGUAGE_CHOICES)
+
+    def test_missing_translations_html_formatting(self):
+        "Return correct HTML for a list of missing languages."
+        test_list = ["English", "Spanish"]
+        expected = "<ul class='missing-list'><li><p>English</p></li>\n<li><p>Spanish</p></li></ul>"
+        assert DocumentContent._format_missing_list(test_list) == expected
+
+    def test_missing_translations_show_all_when_no_translations(self, document_content):
+        "Return list of every language when there are no translations."
+
+        assert (
+            document_content.missing_translations()
+            == DocumentContent._format_missing_list(self.DISPLAY)
+        )
+
+    def test_missing_translations_when_all_languages_covered(self, document_content):
+        "Return message when there are no missing translations."
+
+        for code in self.CODES:
+            DocumentTranslationFactory(document_content=document_content, language=code)
+
+        assert (
+            document_content.missing_translations()
+            == "This document has translations in all supported languages."
+        )
+
+    def test_missing_translations_shows_correct_languages_missing(
+        self, document_content
+    ):
+        """
+        Return list of only the missing languages when some translations exist.
+        DocumentTranslation is built using codes, missing language list uses display value.
+        """
+
+        # get complementary slices
+        existing = self.CODES[2:]
+        missing = self.DISPLAY[:2]
+
+        for code in existing:
+            DocumentTranslationFactory(document_content=document_content, language=code)
+
+        assert (
+            document_content.missing_translations()
+            == DocumentContent._format_missing_list(missing)
+        )

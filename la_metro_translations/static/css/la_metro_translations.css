@@ -8,3 +8,17 @@ Make your changes to the Sass file.
   display: block;
   margin: auto;
 }
+
+ul.missing-list {
+  padding-left: 1rem;
+}
+
+.missing-list > li {
+  list-style-type: disc;
+}
+
+.missing-list p {
+  margin: 0.5rem;
+  padding: 0;
+  font-size: 1.17em;
+}
