@@ -134,32 +134,40 @@ class Command(BaseCommand, ConnManagerMixin):
         logger.info("--- Finished! ---")
 
     def chain_translations(self, extraction_config):
-        # Order the language batches based on priority
-        lang_priority = DocumentTranslation.get_language_priority()
-        ordered = Case(
-            *[
-                When(language=language, then=index)
-                for index, language in enumerate(lang_priority)
-            ]
-        )
+
+        translation_configs = TranslationConfig.objects.all()
 
         # Only return relevant related objects
-        if extraction_config.auto_approve_extractions:
-            for translation_config in TranslationConfig.objects.filter(
-                config=extraction_config
-            ).order_by(ordered):
+        if translation_configs and extraction_config.auto_approve_extractions:
+
+            lang_priority = DocumentTranslation.get_language_priority()
+
+            order = Case(
+                *[
+                    When(language=language, then=index)
+                    for index, language in enumerate(lang_priority)
+                ]
+            )
+
+            relevant = translation_configs.filter(config=extraction_config)
+
+            for translation_config in relevant.order_by(order):
+
                 language_str = dict(DocumentTranslation.LANGUAGE_CHOICES)[
                     translation_config.language
                 ]
+
                 translation_approval_status = (
                     "approved"
                     if translation_config.auto_approve_translations
                     else "waiting"
                 )
+
                 logger.info(
                     f"Triggering {language_str} translations "
                     f"(approval_status={translation_approval_status})..."
                 )
+
                 call_command(
                     "batch_translate",
                     language_str,
