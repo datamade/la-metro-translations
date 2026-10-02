@@ -4,7 +4,11 @@ from rest_framework.test import APIRequestFactory
 from la_metro_translations.api.views import DocumentFilesView
 from django.conf import settings
 
-from tests.conftest import DocumentTranslationFactory
+from tests.conftest import (
+    DocumentTranslationFactory,
+    LinkTextFactory,
+    TranslationFileFactory,
+)
 
 
 @pytest.fixture
@@ -26,25 +30,26 @@ def document_files_response(document_content):
 @pytest.mark.django_db
 class TestDocumentFilesAPIView:
 
-    def test_request_succeeds(self, document_files_response):
+    def test_document_files_api_request_succeeds(self, document_files_response):
         response = document_files_response()
         assert response.status_code == 200
 
-    def test_unapproved_translations_not_included(
+    def test_document_files_api_unapproved_translations_not_included(
         self, document_content, document_files_response, document_translation, link_text
     ):
 
-        spa_translation = document_translation
-        assert spa_translation in document_content.translations.filter(language="spa")
+        assert document_translation in document_content.translations.filter(
+            language="spa"
+        )
 
-        assert spa_translation.approval_status == "waiting"
-        assert link_text().language == "spa"
+        assert document_translation.approval_status == "waiting"
+        assert link_text.language == "spa"
 
         response = document_files_response()
         assert response.data == {"pdf": [], "rtf": []}
 
-    def test_response_attributes(
-        self, document_files_response, document_content, translation_file, link_text
+    def test_document_files_api_response_attributes(
+        self, document_files_response, document_content
     ):
 
         # create link text
@@ -54,7 +59,7 @@ class TestDocumentFilesAPIView:
             "agenda_download_text": "hye - agenda",
         }
 
-        link_text(**link_source_data)
+        LinkTextFactory(**link_source_data)
 
         # create translation
         hye = DocumentTranslationFactory(
@@ -70,7 +75,7 @@ class TestDocumentFilesAPIView:
         }
 
         # create translation file
-        translation_file(**file_source_data)
+        TranslationFileFactory(**file_source_data)
 
         response = document_files_response()
         pdf_data = response.data["pdf"]

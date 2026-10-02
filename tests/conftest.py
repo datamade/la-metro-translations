@@ -103,19 +103,12 @@ def document_translation(document_content):
 
 @pytest.fixture
 def translation_file(document_translation):
-    def build(**kwargs):
-        kwargs.setdefault("document_translation", document_translation)
-        return TranslationFileFactory(**kwargs)
-
-    return build
+    return TranslationFileFactory(document_translation=document_translation)
 
 
 @pytest.fixture
 def link_text():
-    def build(**kwargs):
-        return LinkTextFactory(**kwargs)
-
-    return build
+    return LinkTextFactory()
 
 
 @pytest.fixture
