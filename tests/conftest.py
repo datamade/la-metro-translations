@@ -53,11 +53,28 @@ class DocumentTranslationFactory(factory.django.DjangoModelFactory):
     approval_status = "waiting"
 
 
+class TranslationFileFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = "la_metro_translations.TranslationFile"
+
+    format = "pdf"
+    file = "file.pdf"
+
+
 class ExtractionConfigFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = "la_metro_translations.ExtractionConfig"
 
     auto_approve_extractions = True
+
+
+class LinkTextFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = "la_metro_translations.LinkText"
+
+    language = "spa"
+    agenda_download_text = "spa - download agenda"
+    board_report_download_text = "spa - download board report"
 
 
 class TranslationConfigFactory(factory.django.DjangoModelFactory):
@@ -82,6 +99,23 @@ def document_content(document):
 @pytest.fixture
 def document_translation(document_content):
     return DocumentTranslationFactory(document_content=document_content)
+
+
+@pytest.fixture
+def translation_file(document_translation):
+    def build(**kwargs):
+        kwargs.setdefault("document_translation", document_translation)
+        return TranslationFileFactory(**kwargs)
+
+    return build
+
+
+@pytest.fixture
+def link_text():
+    def build(**kwargs):
+        return LinkTextFactory(**kwargs)
+
+    return build
 
 
 @pytest.fixture
