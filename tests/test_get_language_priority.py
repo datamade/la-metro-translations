@@ -3,25 +3,25 @@ from conftest import TranslationConfigFactory
 from la_metro_translations.models import DocumentTranslation
 
 
-@pytest.fixture
-def lg_config(extraction_config):
-    def build(**kwargs):
-        kwargs.setdefault("config", extraction_config)
-        return TranslationConfigFactory(**kwargs)
-
-    return build
-
-
 @pytest.mark.django_db
-def test_language_priority(lg_config):
+def test_language_priority():
     """
     Test that `get_language_priority` gets languages in the correct order.
     By default, sort order is determined by creation order.
     """
-    lgs = ["spa", "vie", "zho-tw"]
+    spa = TranslationConfigFactory(language="spa", sort_order=0)
+    vie = TranslationConfigFactory(language="vie", sort_order=1)
+    zho = TranslationConfigFactory(language="zho-tw", sort_order=2)
 
-    lg_config(language=lgs[0])
-    lg_config(language=lgs[1])
-    lg_config(language=lgs[2])
+    assert DocumentTranslation.get_language_priority() == ["spa", "vie", "zho-tw"]
 
-    assert DocumentTranslation.get_language_priority() == lgs
+    vie.sort_order = 0
+    vie.save()
+
+    zho.sort_order = 1
+    zho.save()
+
+    spa.sort_order = 2
+    spa.save()
+
+    assert DocumentTranslation.get_language_priority() == ["vie", "zho-tw", "spa"]
