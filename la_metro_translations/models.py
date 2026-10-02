@@ -449,7 +449,10 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
     @staticmethod
     def get_language_priority():
 
-        return [c.language for c in TranslationConfig.objects.order_by("sort_order")]
+        non_eng_lgs = [
+            c.language for c in TranslationConfig.objects.order_by("sort_order")
+        ]
+        return ["eng"] + non_eng_lgs
 
 
 def translation_file_path(instance, filename):
