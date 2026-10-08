@@ -1,7 +1,7 @@
 import functools
 
 from django.contrib.auth.models import Permission, Group
-
+from unittest.mock import patch
 import factory
 import pytest
 
@@ -20,6 +20,19 @@ _PATCH_CONVERT_DOCS_CONVERTER = (
     "la_metro_translations.management.commands.convert_docs"
     ".DocumentTranslationConverter"
 )
+
+
+@pytest.fixture(autouse=True)
+def no_real_background_jobs():
+    """
+    Globally prevent tasks that usually trigger background jobs in separate threads
+    not visible by pytest, from spawning those jobs altogether.
+
+    Note: In order to test the output of those jobs that would have run,
+    call them explicitly within your tests
+    """
+    with patch("la_metro_translations.models.get_backend"):
+        yield
 
 
 class DocumentFactory(factory.django.DjangoModelFactory):
