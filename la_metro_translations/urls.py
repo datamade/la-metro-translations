@@ -10,6 +10,11 @@ from la_metro_translations import views
 from la_metro_translations.api import views as api_views
 
 urlpatterns = [
+    # Django control room urls
+    path("admin/dj-redis-panel/", include("dj_redis_panel.urls")),
+    path("admin/dj-celery-panel/", include("dj_celery_panel.urls")),
+    path("admin/dj-signals-panel/", include("dj_signals_panel.urls")),
+    path("admin/dj-control-room/", include("dj_control_room.urls")),
     path("django-admin/", admin.site.urls),
     path("documents/", include(wagtaildocs_urls)),
     path(

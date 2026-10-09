@@ -27,6 +27,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+      worker:
+        condition: service_started
     volumes:
       - .:/app
       - la_metro_translations-node-modules:/app/node_modules
@@ -39,6 +43,39 @@ services:
       - .env
     entrypoint: /app/docker-entrypoint.sh
     command: python manage.py runserver 0.0.0.0:8000
+
+  worker:
+    image: la_metro_translations
+    hostname: worker
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - la_metro_translations-node-modules:/app/node_modules
+    environment:
+      DJANGO_SECRET_KEY: reallysupersecret
+      DJANGO_DEBUG: "True"
+      PGPASSWORD: postgres
+    env_file:
+      - .env
+    entrypoint: /app/docker-entrypoint.sh
+    command: celery -A la_metro_translations worker --loglevel=info
+
+  redis:
+    container_name: la_metro_translations-redis
+    image: redis:8
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   postgres:
     container_name: la_metro_translations-postgres
