@@ -13,7 +13,7 @@ repos:
         exclude: ^(la_metro_translations/migrations/)
 
   - repo: https://github.com/pycqa/flake8
-    rev: "9f60881"
+    rev: "c48217e1"
     hooks:
       - id: flake8
         exclude: la_metro_translations/migrations

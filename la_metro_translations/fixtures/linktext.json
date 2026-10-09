@@ -1,0 +1,92 @@
+[
+  {
+    "model": "la_metro_translations.linktext",
+    "pk": 1,
+    "fields": {
+      "language": "hye",
+      "agenda_download_text": "Օրակարգը ներբեռնել (Արևելահայերեն)",
+      "board_report_download_text": "Ներբեռնել խորհրդի զեկույցը (Արևելահայերեն)"
+    }
+  },
+  {
+    "model": "la_metro_translations.linktext",
+    "pk": 2,
+    "fields": {
+      "language": "hyw",
+      "agenda_download_text": "Ներբեռնել Օրակարգը (Արևմտահայերէն)",
+      "board_report_download_text": "Ներբեռնել խորհուրդի տեղեկագիրը (Արևմտահայերէն)"
+    }
+  },
+  {
+    "model": "la_metro_translations.linktext",
+    "pk": 3,
+    "fields": {
+      "language": "zho-cn",
+      "agenda_download_text": "下载议程 (汉语)",
+      "board_report_download_text": "下载董事会报告 (汉语)"
+    }
+  },
+  {
+    "model": "la_metro_translations.linktext",
+    "pk": 4,
+    "fields": {
+      "language": "zho-tw",
+      "agenda_download_text": "下載議程 (漢語)",
+      "board_report_download_text": "下載董事會報告 (漢語)"
+    }
+  },
+  {
+    "model": "la_metro_translations.linktext",
+    "pk": 5,
+    "fields": {
+      "language": "eng",
+      "agenda_download_text": "Download Agenda (English - Accessible)",
+      "board_report_download_text": "Download Board Report (English - Accessible)"
+    }
+  },
+  {
+    "model": "la_metro_translations.linktext",
+    "pk": 6,
+    "fields": {
+      "language": "jpn",
+      "agenda_download_text": "議題をダウンロード (日本語)",
+      "board_report_download_text": "取締役会報告書をダウンロード (日本語)"
+    }
+  },
+  {
+    "model": "la_metro_translations.linktext",
+    "pk": 7,
+    "fields": {
+      "language": "kor",
+      "agenda_download_text": "의제 다운로드 (한국어)",
+      "board_report_download_text": "이사회 보고서 다운로드 (한국어)"
+    }
+  },
+  {
+    "model": "la_metro_translations.linktext",
+    "pk": 8,
+    "fields": {
+      "language": "rus",
+      "agenda_download_text": "Скачать повестку дня (Русский)",
+      "board_report_download_text": "Скачать отчет совета директоров (Русский)"
+    }
+  },
+  {
+    "model": "la_metro_translations.linktext",
+    "pk": 9,
+    "fields": {
+      "language": "spa",
+      "agenda_download_text": "Descargar Agenda (Español)",
+      "board_report_download_text": "Descargar informe del consejo (Español)"
+    }
+  },
+  {
+    "model": "la_metro_translations.linktext",
+    "pk": 10,
+    "fields": {
+      "language": "vie",
+      "agenda_download_text": "Tải xuống Chương trình (tiếng Việt)",
+      "board_report_download_text": "Tải xuống Báo Cáo của Hội Đồng Quản Trị (Tiếng Việt)"
+    }
+  }
+]

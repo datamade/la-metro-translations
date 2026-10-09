@@ -22,6 +22,11 @@ urlpatterns = [
         api_views.DocumentUpdateView.as_view(),
         name="update_documents",
     ),
+    path(
+        "api/document-files/",
+        api_views.DocumentFilesView.as_view(),
+        name="document_files",
+    ),
     path("robots.txt/", views.robots_txt),
     path("debug-task/", views.trigger_debug_task, name="debug_task"),
     path("pages/", include(wagtail_urls)),

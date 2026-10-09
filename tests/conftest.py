@@ -1,9 +1,13 @@
 import functools
 
 from django.contrib.auth.models import Permission, Group
-
+from unittest.mock import patch
 import factory
 import pytest
+
+from la_metro_translations.management.commands.convert_docs import (
+    Command as convert_docs_command,
+)
 
 from django.contrib.contenttypes.models import ContentType
 from la_metro_translations.models import (
@@ -12,6 +16,24 @@ from la_metro_translations.models import (
     DocumentTranslation,
 )
 
+_PATCH_CONVERT_DOCS_CONVERTER = (
+    "la_metro_translations.management.commands.convert_docs"
+    ".DocumentTranslationConverter"
+)
+
+
+@pytest.fixture(autouse=True)
+def no_real_background_jobs():
+    """
+    Globally prevent tasks that usually trigger background jobs in separate threads
+    not visible by pytest, from spawning those jobs altogether.
+
+    Note: In order to test the output of those jobs that would have run,
+    call them explicitly within your tests
+    """
+    with patch("la_metro_translations.models.get_backend"):
+        yield
+
 
 class DocumentFactory(factory.django.DjangoModelFactory):
     class Meta:
@@ -19,6 +41,8 @@ class DocumentFactory(factory.django.DjangoModelFactory):
 
     title = "Test Document"
     source_url = "dummy url"
+    created_at = "2026-01-20 10:05:00"
+    updated_at = "2026-01-21 11:45:00"
     document_type = "bill_document"
     document_id = 999
     entity_type = "bill"
@@ -42,11 +66,28 @@ class DocumentTranslationFactory(factory.django.DjangoModelFactory):
     approval_status = "waiting"
 
 
+class TranslationFileFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = "la_metro_translations.TranslationFile"
+
+    format = "pdf"
+    file = "file.pdf"
+
+
 class ExtractionConfigFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = "la_metro_translations.ExtractionConfig"
 
     auto_approve_extractions = True
+
+
+class LinkTextFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = "la_metro_translations.LinkText"
+
+    language = "spa"
+    agenda_download_text = "spa - download agenda"
+    board_report_download_text = "spa - download board report"
 
 
 class TranslationConfigFactory(factory.django.DjangoModelFactory):
@@ -71,6 +112,16 @@ def document_content(document):
 @pytest.fixture
 def document_translation(document_content):
     return DocumentTranslationFactory(document_content=document_content)
+
+
+@pytest.fixture
+def translation_file(document_translation):
+    return TranslationFileFactory(document_translation=document_translation)
+
+
+@pytest.fixture
+def link_text():
+    return LinkTextFactory()
 
 
 @pytest.fixture
@@ -137,7 +188,33 @@ def wagtail_user(django_user_model, wagtail_user_group):
 
 
 @pytest.fixture
+def mock_converter(mocker):
+    bulk_create = mocker.patch.object(
+        convert_docs_command, "bulk_create_translation_files"
+    )
+    converter_cls = mocker.patch(_PATCH_CONVERT_DOCS_CONVERTER)
+    instance = converter_cls.return_value
+    instance.bulk_create = bulk_create
+    return instance
+
+
+@pytest.fixture
 def wagtail_user_client(client, wagtail_user):
     user, plaintext_password = wagtail_user
     client.login(username=user.username, password=plaintext_password)
     return client
+
+
+@pytest.fixture
+def make_document_pages():
+    """Builds fake OCR'd document content out of the given number of "pages",
+    each ending in the "End of Page N" marker that chunk_single_documents
+    splits on."""
+
+    def _make(num_pages):
+        return "".join(
+            f"Some text body for page {i}.\n\nEnd of Page {i}\n\n"
+            for i in range(1, num_pages + 1)
+        )
+
+    return _make

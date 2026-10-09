@@ -6,14 +6,8 @@ on:
     - cron: "0 0 * * *" # Runs every day at midnight UTC
 
 jobs:
-  staging:
+  production:
     uses: ./.github/workflows/run_document_etl.yml
     with:
-      environment: staging
+      environment: production
     secrets: inherit
-
-  # production:
-  #   uses: ./.github/workflows/run_document_etl.yml
-  #   with:
-  #     environment: production
-  #   secrets: inherit

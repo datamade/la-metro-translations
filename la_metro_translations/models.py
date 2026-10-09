@@ -1,11 +1,12 @@
 import re
 
 from django.conf import settings
-from django.core.management import call_command
+from la_metro_translations.backends import get_backend
 from django.db import models
 from django.urls import reverse
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
+from django.utils.formats import date_format
 
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
@@ -56,6 +57,7 @@ class AdminDisplayMixin:
         return "-"
 
     updated_at_display.short_description = "Updated At"
+    updated_at_display.admin_order_field = "updated_at"
 
     def edit_link_display(self):
         edit_url = reverse(
@@ -97,13 +99,11 @@ class Document(AdminDisplayMixin, models.Model):
     title = models.CharField()
     source_url = models.URLField(help_text="Link to the original pdf document.")
     created_at = models.DateTimeField(
-        auto_now_add=True,
         help_text=(
             "Date this original document was created, as per the BoardAgendas app."
         ),
     )
     updated_at = models.DateTimeField(
-        auto_now=True,
         help_text=(
             "Date this original document was updated, as per the BoardAgendas app."
         ),
@@ -223,7 +223,6 @@ class DocumentContent(AdminDisplayMixin, models.Model):
                 if content_changed or content_approved:
                     config = ExtractionConfig.load()
 
-                    # TODO: Probably want to do this asynchronously
                     for (
                         language_code,
                         language_display,
@@ -240,7 +239,7 @@ class DocumentContent(AdminDisplayMixin, models.Model):
                             else "waiting"
                         )
 
-                        call_command(
+                        get_backend().start_job(
                             "batch_translate",
                             language_display,
                             document_content=self.id,
@@ -264,7 +263,7 @@ class DocumentContent(AdminDisplayMixin, models.Model):
         files_btns = files_btn_fragment.format(self.document.source_url, "Original PDF")
 
         try:
-            rtf = self.translations.get(language="en").files.get(format="rtf")
+            rtf = self.translations.get(language="eng").files.get(format="rtf")
         except (DocumentTranslation.DoesNotExist, TranslationFile.DoesNotExist):
             pass
         else:
@@ -278,6 +277,29 @@ class DocumentContent(AdminDisplayMixin, models.Model):
         )
 
     file_formats_display.short_description = "File Formats"
+
+    @classmethod
+    def _format_missing_list(cls, list):
+        return format_html(
+            "<ul class='missing-list'>{}</ul>",
+            format_html_join("\n", "<li><p>{}</p></li>", ((item,) for item in list)),
+        )
+
+    def missing_translations(self):
+
+        existing_translations = list(
+            self.translations.values_list("language", flat=True)
+        )
+        missing = [
+            display
+            for (code, display) in DocumentTranslation.LANGUAGE_CHOICES
+            if code not in existing_translations
+        ]
+
+        if not missing:
+            return "This document has translations in all supported languages."
+
+        return self._format_missing_list(missing)
 
 
 class DocumentTranslation(AdminDisplayMixin, models.Model):
@@ -300,7 +322,7 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
         ("hyw", "Armenian (Western)"),
         ("zho-cn", "Chinese (Simplified)"),
         ("zho-tw", "Chinese (Traditional)"),
-        ("eng", "English"),
+        ("eng", "English (Accessibility)"),
         ("jpn", "Japanese"),
         ("kor", "Korean"),
         ("rus", "Russian"),
@@ -347,7 +369,9 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
                 content_approved = original_obj.approval_status != "approved"
 
                 if content_changed or content_approved:
-                    call_command("convert_docs", document_translation=self.id)
+                    get_backend().start_job(
+                        "convert_docs", document_translation=self.id
+                    )
 
         else:
             return super().save(*args, **kwargs)
@@ -389,18 +413,31 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
     language_display.short_description = "Language"
 
     def file_formats_display(self):
+        latest_file = self.files.order_by("-updated_at").first()
+        conversion_date = latest_file.updated_at if latest_file else None
+        conversion_date_str = (
+            date_format(conversion_date, "N j, Y, P") if conversion_date else None
+        )
+        conversion_message = (
+            f"Generated {conversion_date_str}"
+            if conversion_date_str
+            else "No PDF or RTF files have been generated for this translation."
+        )
+
         if getattr(self, "files", False):
             files_btns = ""
             for f in self.files.all():
                 files_btns += (
                     "<a class='button'"
-                    "style='width: stretch; font-weight: bold; text-align: center;'"
+                    "style='flex: 1; font-weight: bold; text-align: center;'"
                     f"target='_blank' href='{f.get_file_url()}'>{f.format.upper()}</a>"
                 )
 
             return format_html(
-                "<div style='display: flex; justify-content: space-between'>{}</div>",
+                "<div style='display: flex; gap: 0.5rem;'>{}</div>"
+                "<div class='help' style='margin-top: .5rem'>{}</div>",
                 mark_safe(files_btns),
+                conversion_message,
             )
 
         return mark_safe(
@@ -408,6 +445,14 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
         )
 
     file_formats_display.short_description = "File Formats"
+
+    @staticmethod
+    def get_language_priority():
+
+        non_eng_lgs = [
+            c.language for c in TranslationConfig.objects.order_by("sort_order")
+        ]
+        return ["eng"] + non_eng_lgs
 
 
 def translation_file_path(instance, filename):
@@ -445,7 +490,9 @@ class TranslationFile(models.Model):
     ]
 
     format = models.CharField(choices=FORMAT_CHOICES)
-    file = models.FileField(upload_to=translation_file_path, blank=True, null=True)
+    file = models.FileField(
+        upload_to=translation_file_path, blank=True, null=True, max_length=255
+    )
     document_translation = models.ForeignKey(
         DocumentTranslation, on_delete=models.CASCADE, related_name="files"
     )
@@ -534,7 +581,7 @@ class ExtractionConfig(BaseGenericSetting, ClusterableModel):
                         if lang_config.auto_approve_translations
                         else "waiting"
                     )
-                    call_command(
+                    get_backend().start_job(
                         "batch_translate",
                         language_display,
                         approval_status=translation_approval_status,
@@ -544,7 +591,7 @@ class ExtractionConfig(BaseGenericSetting, ClusterableModel):
                             language=lang_config.language,
                             approval_status="waiting",
                         ).update(approval_status="approved")
-                        call_command("convert_docs")
+                        get_backend().start_job("convert_docs")
         else:
             super().save(*args, **kwargs)
 
@@ -598,13 +645,39 @@ class TranslationConfig(Orderable):
                 language_display = dict(DocumentTranslation.LANGUAGE_CHOICES)[
                     self.language
                 ]
-                call_command(
+                get_backend().start_job(
                     "batch_translate", language_display, approval_status="approved"
                 )
                 DocumentTranslation.objects.filter(
                     language=self.language,
                     approval_status="waiting",
                 ).update(approval_status="approved")
-                call_command("convert_docs")
+                get_backend().start_job("convert_docs")
         else:
             super().save(*args, **kwargs)
+
+
+class Disclaimer(models.Model):
+    language = models.CharField(choices=DocumentTranslation.LANGUAGE_CHOICES)
+    disclaimer_text = models.TextField()
+
+    def __str__(self):
+        return f"{self.get_language_display()} [{self.language}] Disclaimer"
+
+    class Meta:
+        ordering = ["language"]
+
+
+class LinkText(models.Model):
+    language = models.CharField(
+        choices=DocumentTranslation.LANGUAGE_CHOICES, unique=True
+    )
+    agenda_download_text = models.TextField()
+    board_report_download_text = models.TextField()
+
+    def __str__(self):
+        return f"{self.get_language_display()} [{self.language}] Link Text"
+
+    class Meta:
+        ordering = ["language"]
+        verbose_name_plural = "Download Link Translations"

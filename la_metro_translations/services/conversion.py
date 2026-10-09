@@ -1,11 +1,17 @@
 import io
+import os
+import re
 import pypandoc
 
 from weasyprint import HTML
 
 from django.core.files.uploadedfile import InMemoryUploadedFile
 
-from la_metro_translations.models import TranslationFile, DocumentTranslation
+from la_metro_translations.models import (
+    Disclaimer,
+    TranslationFile,
+    DocumentTranslation,
+)
 
 
 class DocumentTranslationConverterError(Exception):
@@ -20,21 +26,49 @@ class DocumentTranslationConverter:
             )
 
         self.doc_translation = doc_translation
+        self.doc_css_path = (
+            os.path.dirname(os.path.abspath(__file__))
+            + "/../static/css/converted_docs.css"
+        )
+
+    def _prepend_disclaimer(self, language, text):
+        # All documents also get "translated" into English with no disclaimer
+        # Shortcircuit in that case
+        if language == "eng":
+            return text
+
+        try:
+            disclaimer = Disclaimer.objects.get(language=language)
+        except Disclaimer.DoesNotExist:
+            raise DocumentTranslationConverterError(
+                f"No disclaimer found for target language: {language}"
+            )
+        formatted_disclaimer = f"{disclaimer.disclaimer_text}\n\n---\n\n"
+        return formatted_disclaimer + text
 
     def convert_to_pdf(self) -> TranslationFile:
         md_text = self.doc_translation.markdown or ""
+
+        # Strip alt text.
+        md_text = re.sub(r"!\[[^]]+\]", "![]", md_text)
+
+        language = self.doc_translation.language
+        md_text = self._prepend_disclaimer(language, md_text)
 
         try:
             # Pypandoc requires PDFs to be written to the filesystem so
             # we can first convert the markdown to HTML and then use
             # weasyprint to convert the HTML to PDF in memory
-            html = pypandoc.convert_text(md_text, to="html", format="md")
-            pdf_bytes = HTML(string=html, base_url=".").write_pdf()
+            html = pypandoc.convert_text(
+                md_text, to="html", format="markdown-yaml_metadata_block"
+            )
+            pdf_bytes = HTML(string=html, base_url=".").write_pdf(
+                stylesheets=[self.doc_css_path]
+            )
         except Exception as e:
             raise DocumentTranslationConverterError(f"Conversion failed: {e}")
 
         filename = self.doc_translation.document_content.document.title
-        language = self.doc_translation.language
 
         buffer = io.BytesIO()
         buffer.write(pdf_bytes)
@@ -53,11 +87,66 @@ class DocumentTranslationConverter:
             document_translation=self.doc_translation, format="pdf", file=django_file
         )
 
+    def insert_image_placeholder_text(self, text):
+
+        IMAGE_REMOVED_MAP = {
+            "eng": "Image removed",
+            "spa": "Imagen eliminada",
+            "zho-cn": "图片已删除",
+            "zho-tw": "圖片已刪除",
+            "kor": "이미지가 삭제됨",
+            "hye": "Նկարը հեռացվել է",
+            "hyw": "Նկարը ջնջվել է",
+            "vie": "Hình ảnh đã bị xóa",
+            "rus": "Изображение удалено",
+            "jpn": "画像が削除されました",
+        }
+
+        METRO_LOGO_MAP = {
+            "eng": "Metro logo removed",
+            "spa": "Imagen del logotipo de Metro",
+            "zho-cn": "Metro标志",
+            "zho-tw": "Metro標誌",
+            "kor": "Metro 로고 이미지",
+            "hye": "Metro-ի լոգոյի պատկեր",
+            "hyw": "Մեթրոյի լոկոյի պատկեր",
+            "vie": "Hình ảnh logo của Metro",
+            "rus": "Изображение логотипа Метро",
+            "jpn": "メトロのロゴ画像",
+        }
+
+        # For agendas, mark the first image as the Metro logo
+        language = str(self.doc_translation.language)
+        image_removed_text = IMAGE_REMOVED_MAP[language]
+        metro_logo_text = METRO_LOGO_MAP[language]
+        entity_type = self.doc_translation.document_content.document.entity_type
+        if entity_type == "event":
+            return re.sub(
+                r"!\[(.*?)\]\(data:image/[^)]+\)",
+                lambda m: (
+                    metro_logo_text
+                    if "img-0" in m.group(1).lower()
+                    else image_removed_text
+                ),
+                text,
+            )
+
+        # For board reports, just replace all images with placeholder
+        else:
+            return re.sub(r"!\[.*?\]\(data:image/[^)]+\)", image_removed_text, text)
+
     def convert_to_rtf(self) -> TranslationFile:
         md_text = self.doc_translation.markdown or ""
 
+        md_text = self.insert_image_placeholder_text(md_text)
+
+        language = self.doc_translation.language
+        md_text = self._prepend_disclaimer(language, md_text)
+
         try:
-            output = pypandoc.convert_text(md_text, to="rtf", format="md")
+            output = pypandoc.convert_text(
+                md_text, to="rtf", format="markdown-yaml_metadata_block"
+            )
             out_bytes = (
                 output
                 if isinstance(output, (bytes, bytearray))
@@ -67,8 +156,6 @@ class DocumentTranslationConverter:
             raise DocumentTranslationConverterError(f"Conversion failed: {e}")
 
         filename = self.doc_translation.document_content.document.title
-        content_type = "application/rtf"
-        language = self.doc_translation.language
 
         # Add encoding strings to make sure file renders correctly
         pre_bytes = (
@@ -84,7 +171,7 @@ class DocumentTranslationConverter:
             file=out_io,
             field_name="file",
             name=f"{filename}_{language}.rtf",
-            content_type=content_type,
+            content_type="application/rtf",
             size=out_io.getbuffer().nbytes,
             charset="utf-8",
         )

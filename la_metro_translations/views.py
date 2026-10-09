@@ -1,10 +1,26 @@
 import os
 
-from django.http import JsonResponse
+from django.conf import settings
 from django.shortcuts import render
+from django.views.generic import TemplateView
+from django.http import JsonResponse
+
 from wagtail.admin.auth import require_admin_access
 
 from la_metro_translations.celery import debug_task
+
+
+class PromptView(TemplateView):
+    template_name = "la_metro_translations/prompt.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        file_path = os.path.join(
+            settings.BASE_DIR, "la_metro_translations", "prompt.txt"
+        )
+        with open(file_path) as f:
+            context["prompt_text"] = f.read()
+        return context
 
 
 def robots_txt(request):

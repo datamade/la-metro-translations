@@ -3,19 +3,19 @@ from datetime import datetime
 
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
-from django.db.models import F
-from django.db import connections
+from django.db.models import F, Case, When
 
 from la_metro_translations.models import (
     DocumentContent,
     DocumentTranslation,
 )
 from la_metro_translations.services import get_translation_service
+from la_metro_translations.management.commands.utils import ConnManagerMixin
 
 logger = logging.getLogger(__name__)
 
 
-class Command(BaseCommand):
+class Command(BaseCommand, ConnManagerMixin):
     """
     Translate text from document contents into one of the
     supported languages specified by the user.
@@ -55,10 +55,6 @@ class Command(BaseCommand):
             ),
         )
 
-    def reset_db_connections(self):
-        for conn in connections.all():
-            conn.close_if_unusable_or_obsolete()
-
     def handle(self, **options):
         approval_status = options["approval_status"]
 
@@ -69,7 +65,7 @@ class Command(BaseCommand):
         ]
 
         user_language = options["language"].title()
-        user_language_value = next(  # ie. "es"
+        user_language_value = next(  # ie. "spa"
             (lang[0] for lang in supported_languages if lang[1] == user_language),
             None,
         )
@@ -94,12 +90,18 @@ class Command(BaseCommand):
         else:
             # Get any document contents without translations in this language, or
             # contents that have been updated more recently than their translation.
+
+            events_first = Case(
+                When(document__entity_type="event", then=0),
+                default=1,
+            )
             contents = (
                 DocumentContent.objects.select_related("document")
                 .exclude(
                     translations__updated_at__gte=F("updated_at"),
                     translations__language=user_language_value,
                 )
+                .order_by(events_first)
                 .distinct()
             )
 

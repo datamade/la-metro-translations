@@ -3,8 +3,7 @@ from datetime import datetime
 
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
-from django.db.models import Q, F
-from django.db import connections
+from django.db.models import Q, F, Case, When
 
 from la_metro_translations.models import (
     Document,
@@ -15,11 +14,12 @@ from la_metro_translations.models import (
     TranslationFile,
 )
 from la_metro_translations.services import MistralOCRService
+from la_metro_translations.management.commands.utils import ConnManagerMixin
 
 logger = logging.getLogger(__name__)
 
 
-class Command(BaseCommand):
+class Command(BaseCommand, ConnManagerMixin):
     """
     Extract text from documents that need content, and create/update related objects.
     If auto-approvals are enabled for extractions, chains into batch_translate
@@ -33,10 +33,6 @@ class Command(BaseCommand):
         "TranslationFiles. If auto-approvals are enabled for extractions, then this "
         "chains into batch_translate upon completion. "
     )
-
-    def reset_db_connections(self):
-        for conn in connections.all():
-            conn.close_if_unusable_or_obsolete()
 
     def handle(self, **options):
         # Get any documents without content, or
@@ -138,22 +134,40 @@ class Command(BaseCommand):
         logger.info("--- Finished! ---")
 
     def chain_translations(self, extraction_config):
-        if extraction_config.auto_approve_extractions:
-            for translation_config in TranslationConfig.objects.filter(
-                config=extraction_config
-            ):
+
+        translation_configs = TranslationConfig.objects.all()
+
+        # Only return relevant related objects
+        if translation_configs and extraction_config.auto_approve_extractions:
+
+            lang_priority = DocumentTranslation.get_language_priority()
+
+            order = Case(
+                *[
+                    When(language=language, then=index)
+                    for index, language in enumerate(lang_priority)
+                ]
+            )
+
+            relevant = translation_configs.filter(config=extraction_config)
+
+            for translation_config in relevant.order_by(order):
+
                 language_str = dict(DocumentTranslation.LANGUAGE_CHOICES)[
                     translation_config.language
                 ]
+
                 translation_approval_status = (
                     "approved"
                     if translation_config.auto_approve_translations
                     else "waiting"
                 )
+
                 logger.info(
                     f"Triggering {language_str} translations "
                     f"(approval_status={translation_approval_status})..."
                 )
+
                 call_command(
                     "batch_translate",
                     language_str,

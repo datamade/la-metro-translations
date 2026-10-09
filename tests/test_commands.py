@@ -1,15 +1,24 @@
+import itertools
+import json
 import pytest
-from unittest.mock import patch
+from datetime import datetime, timedelta
+from unittest.mock import MagicMock, patch
 
 from django.core.management import call_command as run_command
 
 from conftest import (
+    DocumentContentFactory,
     DocumentFactory,
     DocumentTranslationFactory,
     ExtractionConfigFactory,
     TranslationConfigFactory,
 )
-from la_metro_translations.models import DocumentContent, DocumentTranslation
+from la_metro_translations.models import (
+    DocumentContent,
+    DocumentTranslation,
+    TranslationFile,
+)
+from la_metro_translations.services.translation import MistralTranslationService
 
 PATCH_OCR = (
     "la_metro_translations.management.commands.batch_extract"
@@ -29,6 +38,20 @@ PATCH_EXTRACT_RESET_DB = (
     "la_metro_translations.management.commands.batch_extract"
     ".Command.reset_db_connections"
 )
+PATCH_CONVERT_RESET_DB = (
+    "la_metro_translations.management.commands.convert_docs"
+    ".Command.reset_db_connections"
+)
+
+PATCH_TRANSLATE_SERVICE = (
+    "la_metro_translations.management.commands.batch_translate.get_translation_service"
+)
+PATCH_START_BATCH_JOB = (
+    "la_metro_translations.services.translation.BatchUtils.start_batch_job"
+)
+PATCH_CHECK_BATCH_JOB = (
+    "la_metro_translations.services.translation.BatchUtils.check_batch_job"
+)
 
 
 @pytest.mark.django_db
@@ -43,6 +66,17 @@ class TestBatchTranslateCommand:
     def no_reset_db(self):
         with patch(PATCH_TRANSLATE_RESET_DB):
             yield
+
+    @pytest.fixture(autouse=True)
+    def mock_translate_service(self, document_content):
+        with patch(PATCH_TRANSLATE_SERVICE) as mock_service:
+            mock_service.return_value.metered_batch_translate.return_value = [
+                {
+                    "document_id": str(document_content.document.document_id),
+                    "markdown": "translated text",
+                }
+            ]
+            yield mock_service
 
     @pytest.mark.parametrize("approval_status", ["waiting", "approved"])
     def test_creates_translations_with_correct_approval_status(
@@ -107,6 +141,107 @@ class TestBatchTranslateCommand:
             document_content=document_content, language="spa"
         )
         assert translation.approval_status == "waiting"
+
+    def test_chunk_single_documents_groups_pages_by_chunk_size(
+        self, make_document_pages
+    ):
+        content = make_document_pages(55)
+
+        chunks = MistralTranslationService.chunk_single_documents(content)
+
+        assert len(chunks) == 11
+        for chunk in chunks:
+            assert chunk.count("End of Page") == 5
+
+    def test_chunk_single_documents_returns_single_chunk_for_small_document(
+        self, make_document_pages
+    ):
+        content = make_document_pages(3)
+
+        chunks = MistralTranslationService.chunk_single_documents(content)
+
+        assert len(chunks) == 1
+        assert chunks[0].count("End of Page") == 3
+
+    def test_batch_translate_stitches_chunks_in_numeric_order(
+        self, document_content, make_document_pages
+    ):
+        """
+        Check that chunks are stitched back in actual numeric order (0, 1, 2, ..., 10)
+        instead of faux-alphabetized ("0", "1", "10", "2", ...).
+
+        This case would only happen if a document produces more than 10 chunks.
+        """
+        document_content.markdown = make_document_pages(55)
+        document_content.save()
+
+        doc = document_content.document
+        doc_custom_id = f"{doc.document_type}:{doc.document_id}"
+
+        # Deliberately out of numeric order
+        chunk_order = [0, 1, 10, 2, 3, 4, 5, 6, 7, 8, 9]
+        response_lines = [
+            json.dumps(
+                {
+                    "custom_id": f"{doc_custom_id}:chunk_{i}",
+                    "response": {
+                        "body": {"choices": [{"message": {"content": f"chunk-{i}-"}}]}
+                    },
+                }
+            )
+            for i in chunk_order
+        ]
+
+        mock_response = MagicMock()
+        mock_response.iter_lines.return_value = response_lines
+
+        with patch(PATCH_START_BATCH_JOB), patch(
+            PATCH_CHECK_BATCH_JOB, return_value=mock_response
+        ):
+            translations = list(
+                MistralTranslationService.batch_translate([document_content], "Spanish")
+            )
+
+        assert len(translations) == 1
+        expected_markdown = "".join(f"chunk-{i}-" for i in range(11))
+        assert translations[0]["markdown"] == expected_markdown
+
+    def test_batch_translate_skips_document_missing_chunks(
+        self, document_content, make_document_pages
+    ):
+        """
+        Check that we don't create translations when our translation service doesn't
+        return all chunks from a single document, instead of creating an incomplete one.
+        """
+        document_content.markdown = make_document_pages(10)
+        document_content.save()
+
+        doc = document_content.document
+        doc_custom_id = f"{doc.document_type}:{doc.document_id}"
+
+        # Expecting 2 chunks from 20 pages (5 pages per chunk), but only return one
+        response_lines = [
+            json.dumps(
+                {
+                    "custom_id": f"{doc_custom_id}:chunk_0",
+                    "response": {
+                        "body": {"choices": [{"message": {"content": "chunk-0-"}}]}
+                    },
+                }
+            )
+        ]
+
+        mock_response = MagicMock()
+        mock_response.iter_lines.return_value = response_lines
+
+        with patch(PATCH_START_BATCH_JOB), patch(
+            PATCH_CHECK_BATCH_JOB, return_value=mock_response
+        ):
+            translations = list(
+                MistralTranslationService.batch_translate([document_content], "Spanish")
+            )
+
+        assert translations == []
 
 
 @pytest.mark.django_db
@@ -202,3 +337,141 @@ class TestBatchExtractCommand:
         run_command("batch_extract")
 
         mock_call_command.assert_not_called()
+
+
+@pytest.mark.django_db
+class TestConvertDocsCommand:
+    """
+    Tests for the convert_docs management command.
+
+    This focuses on how the command creates RTFs for all DocumentTranslations with out-of-date RTFs,
+    and PDFs for all non-English DocumentTranslations with out-of-date PDFs.
+    """
+
+    @pytest.fixture(autouse=True)
+    def no_reset_db(self):
+        with patch(PATCH_CONVERT_RESET_DB):
+            yield
+
+    @pytest.fixture
+    def doc_id_counter(self):
+        counter = itertools.count(1)
+        return lambda: next(counter)
+
+    @pytest.fixture
+    def make_translation(self, doc_id_counter):
+        def _make(language="spa"):
+            doc = DocumentFactory(document_id=doc_id_counter())
+            content = DocumentContentFactory(document=doc)
+            return DocumentTranslationFactory(
+                document_content=content, language=language
+            )
+
+        return _make
+
+    def _set_updated_at(self, obj, dt):
+        type(obj).objects.filter(pk=obj.pk).update(updated_at=dt)
+        obj.refresh_from_db()
+
+    def _make_translation_file(self, translation, fmt, updated_at=None):
+        file = TranslationFile.objects.create(
+            document_translation=translation, format=fmt
+        )
+        if updated_at is not None:
+            TranslationFile.objects.filter(pk=file.pk).update(updated_at=updated_at)
+        return file
+
+    def test_rtf_created_only_for_translations_without_up_to_date_rtf(
+        self, make_translation, mock_converter
+    ):
+        """
+        Only translations missing an RTF or with an outdated RTF (file.updated_at <
+        translation.updated_at) should be processed. Translations with a current RTF
+        must be skipped.
+        """
+        now = datetime.now()
+        past = now - timedelta(hours=1)
+
+        make_translation()  # creates translation missing an RTF
+
+        outdated_rtf = make_translation()  # RTF exists but is stale
+        self._set_updated_at(outdated_rtf, now)
+        self._make_translation_file(outdated_rtf, "rtf", updated_at=past)
+
+        up_to_date = make_translation()  # RTF is current
+        self._set_updated_at(up_to_date, past)
+        self._make_translation_file(up_to_date, "rtf", updated_at=now)
+
+        run_command("convert_docs")
+
+        assert mock_converter.convert_to_rtf.call_count == 2
+
+    def test_pdf_created_only_for_non_english_translations_without_up_to_date_pdf(
+        self, make_translation, mock_converter
+    ):
+        """
+        PDFs should only be created for non-English translations that are missing a
+        PDF or have an outdated one. English translations and those with a current PDF
+        must be skipped.
+
+        This test guards against the exclude() multi-argument bug where
+        .exclude(pk__in=..., language="eng") only excluded rows matching BOTH
+        conditions simultaneously, causing the queryset to return nearly all rows.
+        """
+        now = datetime.now()
+        past = now - timedelta(hours=1)
+
+        make_translation(language="eng")  # always skip eng, even without a PDF
+
+        make_translation(language="spa")  # creates translation missing a PDF
+
+        outdated = make_translation(language="zho-cn")  # PDF exists but is stale
+        self._set_updated_at(outdated, now)
+        self._make_translation_file(outdated, "pdf", updated_at=past)
+
+        up_to_date = make_translation(language="kor")  # PDF is current
+        self._set_updated_at(up_to_date, past)
+        self._make_translation_file(up_to_date, "pdf", updated_at=now)
+
+        run_command("convert_docs")
+
+        assert mock_converter.convert_to_pdf.call_count == 2
+
+    def test_no_files_created_when_all_are_up_to_date(
+        self, make_translation, mock_converter
+    ):
+        """
+        When every translation already has a current RTF and PDF, no converter calls
+        should be made and bulk_create should not be invoked.
+        """
+        now = datetime.now()
+        past = now - timedelta(hours=1)
+
+        non_eng = make_translation(language="spa")
+        self._set_updated_at(non_eng, past)
+        self._make_translation_file(non_eng, "rtf", updated_at=now)
+        self._make_translation_file(non_eng, "pdf", updated_at=now)
+
+        eng = make_translation(language="eng")
+        self._set_updated_at(eng, past)
+        self._make_translation_file(eng, "rtf", updated_at=now)
+
+        run_command("convert_docs")
+
+        mock_converter.convert_to_rtf.assert_not_called()
+        mock_converter.convert_to_pdf.assert_not_called()
+        mock_converter.bulk_create.assert_not_called()
+
+    def test_convert_doc_single_creates_rtf_and_pdf_for_non_english(
+        self, make_translation, mock_converter
+    ):
+        """
+        When called with --document_translation <id> for a non-English translation,
+        the command should create both an RTF and a PDF.
+        """
+        translation = make_translation(language="spa")
+
+        run_command("convert_docs", document_translation=translation.pk)
+
+        mock_converter.convert_to_rtf.assert_called_once()
+        mock_converter.convert_to_pdf.assert_called_once()

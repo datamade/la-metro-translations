@@ -1,8 +1,18 @@
+from django.conf import settings
+from django.db.models import Prefetch
+from django.db.models import Case, When
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
-from la_metro_translations.models import Document
+from la_metro_translations.models import (
+    Document,
+    DocumentContent,
+    DocumentTranslation,
+    LinkText,
+    TranslationFile,
+)
 from la_metro_translations.api.serializers import NotificationSerializer
 
 
@@ -44,3 +54,62 @@ class DocumentUpdateView(APIView):
             "message": f"Success: Document(s) created/updated - {len(created_docs)}"
         }
         return Response(success_msg, status=status.HTTP_201_CREATED)
+
+
+class DocumentFilesView(APIView):
+    """
+    Return urls for an entity's files and translations.
+    """
+
+    def _get_link_text(self, entity_type, language):
+        link_text = LinkText.objects.get(language=language)
+        return (
+            link_text.agenda_download_text
+            if entity_type == "event"
+            else link_text.board_report_download_text
+        )
+
+    def get(self, request):
+        api_key = request.query_params.get("api_key")
+        if api_key != settings.BOARDAGENDAS_API_KEY:
+            error_msg = "Unauthorized: Invalid api key. Double check the key submitted."
+            return Response(error_msg, status=status.HTTP_403_FORBIDDEN)
+
+        entity_type = request.query_params.get("entity_type")
+        document_id = request.query_params.get("document_id")
+
+        lang_order = DocumentTranslation.get_language_priority()
+        ordered = Case(
+            *[
+                When(language=language, then=index)
+                for index, language in enumerate(lang_order)
+            ]
+        )
+
+        # Only return relevant related objects
+        translation_filter = DocumentTranslation.objects.filter(
+            approval_status="approved"
+        ).order_by(ordered)
+        files_filter = TranslationFile.objects.exclude(
+            document_translation__language="eng", format="pdf"
+        )
+        try:
+            content = DocumentContent.objects.prefetch_related(
+                Prefetch("translations", translation_filter),
+                Prefetch("translations__files", files_filter),
+            ).get(document__entity_type=entity_type, document__document_id=document_id)
+        except DocumentContent.DoesNotExist:
+            error_msg = "Not Found: Matching document does not exist in the suite."
+            return Response(error_msg, status=status.HTTP_404_NOT_FOUND)
+
+        file_links = {"pdf": [], "rtf": []}
+        for translation in content.translations.all():
+            for file in translation.files.all():
+                link_details = {
+                    "language": translation.get_language_display(),
+                    "link_text": self._get_link_text(entity_type, translation.language),
+                    "url": file.get_file_url(),
+                }
+                file_links[file.format].append(link_details)
+
+        return Response(file_links, status=status.HTTP_200_OK)

@@ -1,17 +1,35 @@
 from wagtail import hooks
+from wagtail.admin.menu import MenuItem
 from wagtail.admin.panels import FieldPanel, MultiFieldPanel, FieldRowPanel
 from wagtail.admin.viewsets.model import ModelViewSet
 from wagtail.admin.filters import WagtailFilterSet
 from wagtail.contrib.settings.registry import register_setting
 from wagtail.permissions import ModelPermissionPolicy
-from wagtail.snippets.views.snippets import IndexView
+from wagtail.snippets.views.snippets import IndexView, SnippetViewSet
+from wagtail.snippets.models import register_snippet
 
+from django.utils.html import format_html
+from django.templatetags.static import static
 from django_filters import CharFilter, ChoiceFilter
+from django.urls import path, reverse
+from .views import PromptView
 
-from .models import Document, DocumentContent, DocumentTranslation, ExtractionConfig
+from .models import (
+    Document,
+    DocumentContent,
+    DocumentTranslation,
+    ExtractionConfig,
+    Disclaimer,
+    LinkText,
+)
 from .panels import PropertyPanel, RelatedObjectsPanel
 
-register_setting(ExtractionConfig, icon="cog")
+
+@hooks.register("insert_global_admin_css")
+def global_admin_css():
+    return format_html(
+        '<link rel="stylesheet" href="{}">', static("css/la_metro_translations.css")
+    )
 
 
 class ReadEditOnlyPermissionPolicy(ModelPermissionPolicy):
@@ -55,6 +73,7 @@ class DocumentViewSet(ModelViewSet):
         "source_url_display",
         "board_agendas_url_display",
     ]
+    ordering = ["-updated_at"]
 
     @property
     def permission_policy(self):
@@ -129,6 +148,14 @@ class DocumentViewSet(ModelViewSet):
                 ),
             ],
             heading="Document Translations",
+        ),
+        RelatedObjectsPanel(
+            "la_metro_translations.DocumentContent",
+            "document",
+            panels=[
+                PropertyPanel("missing_translations"),
+            ],
+            heading="Missing translations",
         ),
     ]
 
@@ -243,6 +270,7 @@ class DocumentContentViewSet(ModelViewSet):
             ],
             heading="Document Translations",
         ),
+        PropertyPanel("missing_translations", heading="Missing translations"),
     ]
 
 
@@ -380,6 +408,33 @@ class DocumentTranslationViewSet(ModelViewSet):
     ]
 
 
+class DisclaimerViewSet(SnippetViewSet):
+
+    model = Disclaimer
+
+    panels = [
+        FieldPanel("language"),
+        FieldPanel("disclaimer_text"),
+    ]
+
+
+register_snippet(DisclaimerViewSet)
+
+
+class LinkTextViewSet(SnippetViewSet):
+
+    model = LinkText
+
+    panels = [
+        FieldPanel("language"),
+        FieldPanel("agenda_download_text"),
+        FieldPanel("board_report_download_text"),
+    ]
+
+
+register_snippet(LinkTextViewSet)
+
+
 @hooks.register("register_admin_viewset")
 def register_document_viewset():
     return DocumentViewSet("document")
@@ -395,6 +450,43 @@ def register_document_translation_viewset():
     return DocumentTranslationViewSet("document_translation")
 
 
+@hooks.register("register_admin_urls")
+def register_prompt_url():
+    return [
+        path("prompt/", PromptView.as_view(), name="prompt"),
+    ]
+
+
+# Custom settings items, put at top of list (order before 100)
+register_setting(ExtractionConfig, icon="cog", order=50)
+
+
+@hooks.register("register_settings_menu_item")
+def register_prompt_menu_item():
+    return MenuItem("Prompt", reverse("prompt"), icon_name="openquote", order=51)
+
+
+@hooks.register("register_settings_menu_item")
+def register_disclaimer_menu_item():
+    return MenuItem(
+        "Disclaimers",
+        reverse("wagtailsnippets_la_metro_translations_disclaimer:list"),
+        icon_name="info-circle",
+        order=52,
+    )
+
+
+@hooks.register("register_settings_menu_item")
+def register_link_text_menu_item():
+    return MenuItem(
+        "Download Link Text",
+        reverse("wagtailsnippets_la_metro_translations_linktext:list"),
+        icon_name="info-circle",
+        order=53,
+    )
+
+
+# Only show selected elements in main menu
 @hooks.register("construct_main_menu")
 def hide_all_but_modeladmin_and_settings(request, menu_items):
     signatures = (

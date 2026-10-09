@@ -17,7 +17,21 @@ from la_metro_translations.models import Document
 logger = logging.getLogger(__name__)
 
 
+# bold all subject lines
+def normalize_subject_lines(text: str) -> str:
+    pattern = re.compile(r"^(###\s)?(\d+\.\s)?(SUBJECT:\s.*)$", re.MULTILINE)
+
+    def replacer(match):
+        prefix = match.group(2) or ""
+        subject = match.group(3) or ""
+
+        return f"**{prefix}{subject}**"
+
+    return pattern.sub(replacer, text)
+
+
 class MistralOCRService:
+
     @staticmethod
     def extract_text(document: Document) -> str | None:
         """
@@ -122,16 +136,20 @@ class MistralOCRService:
     @staticmethod
     def process_pages(pages: List[dict], document_type: str) -> str:
         """
-        Reinserts tables, images, and links into the markdown of each page.
+        Formats all headers to be the same level.
+        Then reinserts tables, images, and links into the markdown of each page.
         """
 
         doc_text = ""
 
         for page in pages:
-            markdown = page["markdown"]
-
             # Unescaped dollar signs cause unintended math formatting
-            markdown = markdown.replace("$", "\\$")
+            raw_markdown = page["markdown"].replace("$", "\\$")
+
+            # Format all markdown headers to be h3 level
+            markdown = re.sub(r"^#{1,6}\s+", "### ", raw_markdown, flags=re.MULTILINE)
+
+            markdown = normalize_subject_lines(markdown)
 
             # Insert extracted tables, images, and links
             for table in page["tables"]:
