@@ -23,6 +23,7 @@ urlpatterns = [
         name="update_documents",
     ),
     path("robots.txt/", views.robots_txt),
+    path("debug-task/", views.trigger_debug_task, name="debug_task"),
     path("pages/", include(wagtail_urls)),
     path("", include(wagtailadmin_urls)),
 ]
