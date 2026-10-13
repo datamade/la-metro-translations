@@ -10,7 +10,7 @@ from la_metro_translations.models import (
     Document,
     DocumentContent,
     DocumentTranslation,
-    LinkText,
+    StandardTranslations,
     TranslationFile,
 )
 from la_metro_translations.api.serializers import NotificationSerializer
@@ -62,7 +62,7 @@ class DocumentFilesView(APIView):
     """
 
     def _get_link_text(self, entity_type, language):
-        link_text = LinkText.objects.get(language=language)
+        link_text = StandardTranslations.objects.get(language=language)
         return (
             link_text.agenda_download_text
             if entity_type == "event"
