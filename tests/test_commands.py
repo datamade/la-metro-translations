@@ -17,6 +17,7 @@ from la_metro_translations.models import (
     DocumentContent,
     DocumentTranslation,
     TranslationFile,
+    TranslationConfig,
 )
 from la_metro_translations.services.translation import MistralTranslationService
 
@@ -164,7 +165,7 @@ class TestBatchTranslateCommand:
         assert chunks[0].count("End of Page") == 3
 
     def test_batch_translate_stitches_chunks_in_numeric_order(
-        self, document_content, make_document_pages
+        self, document_content, make_document_pages, translation_config
     ):
         """
         Check that chunks are stitched back in actual numeric order (0, 1, 2, ..., 10)
@@ -242,6 +243,27 @@ class TestBatchTranslateCommand:
             )
 
         assert translations == []
+
+    @pytest.mark.parametrize(
+        "target_translator",
+        [choice[0] for choice in TranslationConfig.TARGET_TRANSLATOR_CHOICES],
+    )
+    def test_translations_use_chosen_llm(self, document_content, target_translator):
+        """
+        Check that translation jobs use the llm chosen by the user
+        per the language's config settings.
+        """
+        TranslationConfigFactory(language="spa", target_translator=target_translator)
+
+        with patch(PATCH_START_BATCH_JOB) as mock_start_batch_job, patch(
+            PATCH_CHECK_BATCH_JOB, return_value=None
+        ):
+            list(
+                MistralTranslationService.batch_translate([document_content], "Spanish")
+            )
+
+        mock_start_batch_job.assert_called_once()
+        assert mock_start_batch_job.call_args.kwargs["model"] == target_translator
 
 
 @pytest.mark.django_db
