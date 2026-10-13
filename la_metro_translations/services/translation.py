@@ -90,6 +90,9 @@ class MistralTranslationService(TranslationService):
         target_translator = MistralTranslationService.get_target_translator(
             dest_language
         )
+        if not target_translator:
+            return
+
         try:
             chat_response = client.chat.complete(
                 model=target_translator,
@@ -196,8 +199,11 @@ class MistralTranslationService(TranslationService):
                     }
                 )
 
-        # Start batch job
         target_translator = MistralTranslationService.get_target_translator(language)
+        if not target_translator:
+            return
+
+        # Start batch job
         created_job = BatchUtils.start_batch_job(
             client=client,
             entries=entries,
@@ -417,6 +423,9 @@ class MistralTranslationService(TranslationService):
         """
         Gets the name of the translation LLM that will be used to perform translations
         into a given language. This translation model is chosen by the user in Wagtail.
+
+        If no matching `TranslationConfig` is found for the given language,
+        print errors and return None
 
         :param str language_display: The title-cased display value of the language (i.e. "Spanish")
         :return: The name of the large language model used for this language's
