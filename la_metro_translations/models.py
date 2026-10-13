@@ -657,32 +657,6 @@ class TranslationConfig(Orderable):
             super().save(*args, **kwargs)
 
 
-class Disclaimer(models.Model):
-    language = models.CharField(choices=DocumentTranslation.LANGUAGE_CHOICES)
-    disclaimer_text = models.TextField()
-
-    def __str__(self):
-        return f"{self.get_language_display()} [{self.language}] Disclaimer"
-
-    class Meta:
-        ordering = ["language"]
-
-
-class LinkText(models.Model):
-    language = models.CharField(
-        choices=DocumentTranslation.LANGUAGE_CHOICES, unique=True
-    )
-    agenda_download_text = models.TextField()
-    board_report_download_text = models.TextField()
-
-    def __str__(self):
-        return f"{self.get_language_display()} [{self.language}] Link Text"
-
-    class Meta:
-        ordering = ["language"]
-        verbose_name_plural = "Download Link Translations"
-
-
 class StandardTranslations(models.Model):
     language = models.CharField(
         choices=DocumentTranslation.LANGUAGE_CHOICES, unique=True
