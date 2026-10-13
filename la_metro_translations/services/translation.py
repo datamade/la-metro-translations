@@ -14,7 +14,11 @@ from django.db.models import QuerySet
 from mistralai import Mistral
 from mistralai.models.sdkerror import SDKError
 
-from la_metro_translations.models import DocumentContent
+from la_metro_translations.models import (
+    DocumentContent,
+    DocumentTranslation,
+    TranslationConfig,
+)
 
 logger = logging.getLogger(__name__)
 with open("la_metro_translations/prompt.txt") as f:
@@ -83,9 +87,12 @@ class MistralTranslationService(TranslationService):
             content.markdown
         )
 
+        target_translator = MistralTranslationService.get_target_translator(
+            dest_language
+        )
         try:
             chat_response = client.chat.complete(
-                model="mistral-small-latest",
+                model=target_translator,
                 messages=[
                     {
                         "role": "system",
@@ -190,10 +197,11 @@ class MistralTranslationService(TranslationService):
                 )
 
         # Start batch job
+        target_translator = MistralTranslationService.get_target_translator(language)
         created_job = BatchUtils.start_batch_job(
             client=client,
             entries=entries,
-            model="mistral-small-latest",
+            model=target_translator,
             endpoint="/v1/chat/completions",
             timeout_hours=timeout_hours,
         )
@@ -403,3 +411,32 @@ class MistralTranslationService(TranslationService):
                 curr_batch_size = 0
                 curr_batch = []
                 batch_num += 1
+
+    @staticmethod
+    def get_target_translator(language_display: str) -> str | None:
+        """
+        Gets the name of the translation LLM that will be used to perform translations
+        into a given language. This translation model is chosen by the user in Wagtail.
+
+        :param str language_display: The title-cased display value of the language (i.e. "Spanish")
+        :return: The name of the large language model used for this language's
+            translations (i.e. "mistral-small-latest")
+        :rtype: str or None
+        """
+        supported_languages = DocumentTranslation.LANGUAGE_CHOICES
+        language_value = next(  # ie. "spa"
+            (lang[0] for lang in supported_languages if lang[1] == language_display),
+            None,
+        )
+        try:
+            translation_config = TranslationConfig.objects.get(language=language_value)
+        except TranslationConfig.DoesNotExist as e:
+            logger.warning(
+                f"Error occurred when translating document to {language_display}. "
+                f"No TranslationConfig found for {language_display}"
+            )
+            logger.warning(e)
+            logger.warning("Unable to translate. Skipping...")
+            return
+
+        return translation_config.target_translator
