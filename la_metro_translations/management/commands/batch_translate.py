@@ -11,6 +11,9 @@ from la_metro_translations.models import (
 )
 from la_metro_translations.services import get_translation_service
 from la_metro_translations.management.commands.utils import ConnManagerMixin
+from la_metro_translations.management.commands.text_utils import (
+    replace_inner_region_with_placeholder,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +58,32 @@ class Command(BaseCommand, ConnManagerMixin):
             ),
         )
 
+    def _remove_boilerplate(self, contents):
+        """
+        Remove boilerplate from documents so we don't keep re-translating it.
+
+        Pre-translated boilerplate will be re-inserted in the conversion step.
+        """
+
+        BOILERPLATE = {
+            "agenda_23": {
+                "placeholder": "<AGENDA_PAGE_2_3_PLACEHOLDER>",
+                "start": "End of Page 1\n",
+                "end": "End of Page 3\n",
+            }
+        }
+
+        for content in contents:
+
+            # Remove page 2 and 3 of event agendas
+            if content.document.get_entity_type_display() == "Event":
+                md_text = content.markdown
+                content.markdown = replace_inner_region_with_placeholder(
+                    md_text, **BOILERPLATE["agenda_23"]
+                )
+
+        DocumentContent.objects.bulk_update(contents, ["markdown"])
+
     def handle(self, **options):
         approval_status = options["approval_status"]
 
@@ -85,6 +114,8 @@ class Command(BaseCommand, ConnManagerMixin):
                 id=document_content_id
             )
 
+            self._remove_boilerplate(contents)
+
             if not contents.exists():
                 raise ValueError(
                     f"Document content with the specified ID '{document_content_id}' "
@@ -108,6 +139,8 @@ class Command(BaseCommand, ConnManagerMixin):
                 .order_by(events_first)
                 .distinct()
             )
+
+            self._remove_boilerplate(contents)
 
         if len(contents) == 0:
             logger.info(f"All Documents have up to date {user_language} translations!")
