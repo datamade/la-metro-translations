@@ -13,6 +13,8 @@ from conftest import (
     ExtractionConfigFactory,
     TranslationConfigFactory,
 )
+
+from la_metro_translations.management.commands.text_utils import AGENDA_2_3_PLACEHOLDER
 from la_metro_translations.models import (
     DocumentContent,
     DocumentTranslation,
@@ -95,6 +97,30 @@ class TestBatchTranslateCommand:
             document_content=document_content, language="spa"
         )
         assert translation.approval_status == approval_status
+
+    @patch(PATCH_EXTRACT_CALL_COMMAND)
+    def test_remove_boilerplace_selects_agenda_and_persists_in_db(
+        self, _mock_call_command, make_document_pages
+    ):
+        markdown = make_document_pages(5)
+        agenda = DocumentFactory(entity_type="event", document_id="888")
+        report = DocumentFactory(entity_type="bill", document_id="889")
+        agenda_content = DocumentContentFactory(document=agenda, markdown=markdown)
+        report_content = DocumentContentFactory(document=report, markdown=markdown)
+
+        run_command(
+            "batch_translate",
+            "Spanish",
+        )
+
+        agenda_content.refresh_from_db()
+        report_content.refresh_from_db()
+
+        print(agenda_content.markdown)
+        print(report_content.markdown)
+        assert AGENDA_2_3_PLACEHOLDER in agenda_content.markdown
+        assert "End of Page 2" not in agenda_content.markdown
+        assert "End of Page 2" in report_content.markdown
 
     @pytest.mark.parametrize(
         "approval_status,expect_convert_docs",
