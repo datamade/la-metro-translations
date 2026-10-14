@@ -434,7 +434,11 @@ class MistralTranslationService(TranslationService):
         """
         supported_languages = DocumentTranslation.LANGUAGE_CHOICES
         language_value = next(  # ie. "spa"
-            (lang[0] for lang in supported_languages if lang[1] == language_display),
+            (
+                value
+                for value, display in supported_languages
+                if display == language_display
+            ),
             None,
         )
         try:
