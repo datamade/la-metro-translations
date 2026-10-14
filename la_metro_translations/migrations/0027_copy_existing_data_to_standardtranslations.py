@@ -17,10 +17,10 @@ def merge_or_split_models(*, source, destination):
             for row in source.objects.all():
                 copy_row(model, row, cols_to_copy)
 
-def copy_row(dest_model, row, copy_fields):
+def copy_row(dest_model, row, cols):
     dest_model.objects.update_or_create(
         language=row.language,
-        defaults={key: getattr(row, key) for key in copy_fields}
+        defaults={col: getattr(row, col) for col in cols}
     )
 
 def forwards(apps, _schema_editor):
