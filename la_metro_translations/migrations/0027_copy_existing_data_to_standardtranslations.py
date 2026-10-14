@@ -1,21 +1,46 @@
 from django.db import migrations
 
 APP = "la_metro_translations"
-OLD_MODELS = ["LinkText", "Disclaimer"]
 SKIP = ["id", "language"]
 
-def copy_over(apps, _schema_editor):
-    new_model = apps.get_model(APP, "StandardTranslations")
-    for model in OLD_MODELS:
-        old_model = apps.get_model(APP, model)
-        all_fields = old_model._meta.concrete_fields
-        copy_fields = [f.name for f in all_fields if f.name not in SKIP]
-        for row in old_model.objects.all():
-            new_model.objects.update_or_create(
-                language=row.language,
-                defaults={key: getattr(row, key) for key in copy_fields}
-            )
+def merge_or_split_models(*, source, destination):
+    merge = isinstance(source, list)
+    separate_models = source if merge else destination
+
+    for model in separate_models:
+        all_cols = model._meta.concrete_fields
+        cols_to_copy = [f.name for f in all_cols if f.name not in SKIP]
+        if merge:
+            for row in model.objects.all():
+                copy_row(destination, row, cols_to_copy)
+        else:
+            for row in source.objects.all():
+                copy_row(model, row, cols_to_copy)
+
+def copy_row(dest_model, row, copy_fields):
+    dest_model.objects.update_or_create(
+        language=row.language,
+        defaults={key: getattr(row, key) for key in copy_fields}
+    )
+
+def forwards(apps, _schema_editor):
+    StandardTranslations = apps.get_model(APP, "StandardTranslations")
+    LinkText = apps.get_model(APP, "LinkText")
+    Disclaimer = apps.get_model(APP, "Disclaimer")
+    merge_or_split_models(
+        source=[LinkText, Disclaimer],
+        destination=StandardTranslations
+    )
+
+def backwards(apps, _schema_editor):
+    StandardTranslations = apps.get_model(APP, "StandardTranslations")
+    LinkText = apps.get_model(APP, "LinkText")
+    Disclaimer = apps.get_model(APP, "Disclaimer")
+    merge_or_split_models(
+        source=StandardTranslations,
+        destination=[LinkText, Disclaimer]
+    )
 
 class Migration(migrations.Migration):
     dependencies = [(APP, "0026_standardtranslations")]
-    operations = [migrations.RunPython(copy_over, migrations.RunPython.noop)]
+    operations = [migrations.RunPython(forwards, backwards)]
