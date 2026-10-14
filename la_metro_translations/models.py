@@ -658,6 +658,18 @@ class TranslationConfig(Orderable):
 
 
 class StandardTranslations(models.Model):
+    """
+    This model is for pre-translated bits of text and boilerplate that do not
+    need to be translated each time. Metro manages these in Wagtail.
+
+    The text in DocumentTranslations is the result of removing boilerplate, LLM
+    translation of the remaining text, and then inserting pre-translated
+    boilerplate from here into the LLM translation before document conversion.
+
+    Some frontend snippets also live here, e.g. download link text.
+
+    """
+
     language = models.CharField(
         choices=DocumentTranslation.LANGUAGE_CHOICES, unique=True
     )
