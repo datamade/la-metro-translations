@@ -38,12 +38,12 @@ class DocumentTranslationConverter:
             return text
 
         try:
-            translations = StandardTranslations.objects.get(language=language)
+            pretranslated = StandardTranslations.objects.get(language=language)
         except StandardTranslations.DoesNotExist:
             raise DocumentTranslationConverterError(
                 f"No disclaimer found for target language: {language}"
             )
-        formatted_disclaimer = f"{translations.disclaimer_text}\n\n---\n\n"
+        formatted_disclaimer = f"{pretranslated.disclaimer_text}\n\n---\n\n"
         return formatted_disclaimer + text
 
     def convert_to_pdf(self) -> TranslationFile:

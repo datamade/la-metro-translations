@@ -62,11 +62,11 @@ class DocumentFilesView(APIView):
     """
 
     def _get_link_text(self, entity_type, language):
-        link_text = StandardTranslations.objects.get(language=language)
+        pretranslated = StandardTranslations.objects.get(language=language)
         return (
-            link_text.agenda_download_text
+            pretranslated.agenda_download_text
             if entity_type == "event"
-            else link_text.board_report_download_text
+            else pretranslated.board_report_download_text
         )
 
     def get(self, request):
