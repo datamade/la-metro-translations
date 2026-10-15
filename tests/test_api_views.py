@@ -6,7 +6,7 @@ from django.conf import settings
 
 from tests.conftest import (
     DocumentTranslationFactory,
-    LinkTextFactory,
+    StandardTranslationsFactory,
     TranslationFileFactory,
 )
 
@@ -35,7 +35,11 @@ class TestDocumentFilesAPIView:
         assert response.status_code == 200
 
     def test_document_files_api_unapproved_translations_not_included(
-        self, document_content, document_files_response, document_translation, link_text
+        self,
+        document_content,
+        document_files_response,
+        document_translation,
+        standard_translations,
     ):
 
         assert document_translation in document_content.translations.filter(
@@ -43,7 +47,7 @@ class TestDocumentFilesAPIView:
         )
 
         assert document_translation.approval_status == "waiting"
-        assert link_text.language == "spa"
+        assert standard_translations.language == "spa"
 
         response = document_files_response()
         assert response.data == {"pdf": [], "rtf": []}
@@ -59,7 +63,7 @@ class TestDocumentFilesAPIView:
             "agenda_download_text": "hye - agenda",
         }
 
-        LinkTextFactory(**link_source_data)
+        StandardTranslationsFactory(**link_source_data)
 
         # create translation
         hye = DocumentTranslationFactory(

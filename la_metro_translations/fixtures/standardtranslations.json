@@ -1,0 +1,102 @@
+[
+  {
+    "model": "la_metro_translations.standardtranslations",
+    "pk": 1,
+    "fields": {
+      "language": "hye",
+      "agenda_download_text": "Օրակարգը ներբեռնել (Արևելահայերեն)",
+      "board_report_download_text": "Ներբեռնել խորհրդի զեկույցը (Արևելահայերեն)",
+      "disclaimer_text": "Այս տեքստը ստեղծվել է ավտոմատ մեքենայական թարգմանության միջոցով։ Այն տրամադրվում է հարմարության համար և Metro-ի պաշտոնական գրառում չէ։ Թարգմանված տեքստը կարող է փոփոխվել՝ տեքստի վերանայման կամ համակարգի բարելավումների հիման վրա»"
+    }
+  },
+  {
+    "model": "la_metro_translations.standardtranslations",
+    "pk": 2,
+    "fields": {
+      "language": "hyw",
+      "agenda_download_text": "Ներբեռնել Օրակարգը (Արևմտահայերէն)",
+      "board_report_download_text": "Ներբեռնել խորհուրդի տեղեկագիրը (Արևմտահայերէն)",
+      "disclaimer_text": "Այս տեքստը ստեղծվել է ավտոմատ մեքենայական թարգմանության միջոցով: Այն տրամադրվում է հարմարության համար և Metro-ի պաշտոնական գրառում չէ: Թարգմանված տեքստը կարող է փոփոխվել՝ տեքստի վերանայման կամ համակարգի բարելավումների հիման վրա"
+    }
+  },
+  {
+    "model": "la_metro_translations.standardtranslations",
+    "pk": 3,
+    "fields": {
+      "language": "zho-cn",
+      "agenda_download_text": "下载议程 (汉语)",
+      "board_report_download_text": "下载董事会报告 (汉语)",
+      "disclaimer_text": "本文本为机器自动生成的翻译，仅供使用方便，幷非官方Metro记录。译文内容可能随原文修订或系统升级而变更。"
+    }
+  },
+  {
+    "model": "la_metro_translations.standardtranslations",
+    "pk": 4,
+    "fields": {
+      "language": "zho-tw",
+      "agenda_download_text": "下載議程 (漢語)",
+      "board_report_download_text": "下載董事會報告 (漢語)",
+      "disclaimer_text": "本文本爲機器自動生成的翻譯，僅供使用方便，幷非官方Metro記錄。譯文內容可能隨原文修訂或系統升級而變更。"
+    }
+  },
+  {
+    "model": "la_metro_translations.standardtranslations",
+    "pk": 5,
+    "fields": {
+      "language": "eng",
+      "agenda_download_text": "Download Agenda (English - Accessible)",
+      "board_report_download_text": "Download Board Report (English - Accessible)",
+      "disclaimer_text": ""
+    }
+  },
+  {
+    "model": "la_metro_translations.standardtranslations",
+    "pk": 6,
+    "fields": {
+      "language": "jpn",
+      "agenda_download_text": "議題をダウンロード (日本語)",
+      "board_report_download_text": "取締役会報告書をダウンロード (日本語)",
+      "disclaimer_text": "このテキストは自動機械翻訳によって生成されます。これは便宜上提供されており、公式のMetro記録ではありません。翻訳テキストはテキストの改訂やシステムの強化によって変更されることがあります."
+    }
+  },
+  {
+    "model": "la_metro_translations.standardtranslations",
+    "pk": 7,
+    "fields": {
+      "language": "kor",
+      "agenda_download_text": "의제 다운로드 (한국어)",
+      "board_report_download_text": "이사회 보고서 다운로드 (한국어)",
+      "disclaimer_text": "이 내용은 자동 기계 번역을 통해 생성되었습니다. 이는 편의를 위해 제공되는 것으로서 Metro의 공식 기록이 아닙니다. 번역된 내용은 원문의 수정이나 시스템 개선에 따라 변경될 수 있습니다."
+    }
+  },
+  {
+    "model": "la_metro_translations.standardtranslations",
+    "pk": 8,
+    "fields": {
+      "language": "rus",
+      "agenda_download_text": "Скачать повестку дня (Русский)",
+      "board_report_download_text": "Скачать отчет совета директоров (Русский)",
+      "disclaimer_text": "Данный текст получен средствами автоматического машинного перевода. Он предназначен для удобства пользования и не является официальным документом Metro. Перевод может меняться при внесении правок в исходный текст, а также в связи с усовершенствованием системы."
+    }
+  },
+  {
+    "model": "la_metro_translations.standardtranslations",
+    "pk": 9,
+    "fields": {
+      "language": "spa",
+      "agenda_download_text": "Descargar Agenda (Español)",
+      "board_report_download_text": "Descargar informe del consejo (Español)",
+      "disclaimer_text": "Este texto fue generado por un sistema de traducción automática. Se proporciona para su comodidad y no es un registro oficial de Metro. El texto traducido podría cambiar debido a revisiones del texto o mejoras del sistema."
+    }
+  },
+  {
+    "model": "la_metro_translations.standardtranslations",
+    "pk": 10,
+    "fields": {
+      "language": "vie",
+      "agenda_download_text": "Tải xuống Chương trình (tiếng Việt)",
+      "board_report_download_text": "Tải xuống Báo Cáo của Hội Đồng Quản Trị (Tiếng Việt)",
+      "disclaimer_text": "Văn bản này được tạo ra bằng công cụ dịch máy tự động. Văn bản được cung cấp nhằm mục đích thuận tiện và không phải là hồ sơ chính thức của Metro. Nội dung bản dịch có thể thay đổi khi văn bản được chỉnh sửa hoặc khi hệ thống được nâng cấp."
+    }
+  }
+]

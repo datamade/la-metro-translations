@@ -657,27 +657,30 @@ class TranslationConfig(Orderable):
             super().save(*args, **kwargs)
 
 
-class Disclaimer(models.Model):
-    language = models.CharField(choices=DocumentTranslation.LANGUAGE_CHOICES)
-    disclaimer_text = models.TextField()
+class StandardTranslations(models.Model):
+    """
+    This model is for pre-translated bits of text and boilerplate that do not
+    need to be translated each time. Metro manages these in Wagtail.
 
-    def __str__(self):
-        return f"{self.get_language_display()} [{self.language}] Disclaimer"
+    The text in DocumentTranslations is the result of removing boilerplate, LLM
+    translation of the remaining text, and then inserting pre-translated
+    boilerplate from here into the LLM translation before document conversion.
 
-    class Meta:
-        ordering = ["language"]
+    Some frontend snippets also live here, e.g. download link text.
 
+    """
 
-class LinkText(models.Model):
     language = models.CharField(
         choices=DocumentTranslation.LANGUAGE_CHOICES, unique=True
     )
     agenda_download_text = models.TextField()
     board_report_download_text = models.TextField()
+    disclaimer_text = models.TextField()
 
     def __str__(self):
-        return f"{self.get_language_display()} [{self.language}] Link Text"
+        return f"{self.get_language_display()} [{self.language}] Standard Translations"
 
     class Meta:
         ordering = ["language"]
-        verbose_name_plural = "Download Link Translations"
+        verbose_name = "Standard Translations"
+        verbose_name_plural = "Standard Translations"

@@ -81,9 +81,9 @@ class ExtractionConfigFactory(factory.django.DjangoModelFactory):
     auto_approve_extractions = True
 
 
-class LinkTextFactory(factory.django.DjangoModelFactory):
+class StandardTranslationsFactory(factory.django.DjangoModelFactory):
     class Meta:
-        model = "la_metro_translations.LinkText"
+        model = "la_metro_translations.StandardTranslations"
 
     language = "spa"
     agenda_download_text = "spa - download agenda"
@@ -120,8 +120,8 @@ def translation_file(document_translation):
 
 
 @pytest.fixture
-def link_text():
-    return LinkTextFactory()
+def standard_translations():
+    return StandardTranslationsFactory()
 
 
 @pytest.fixture

@@ -8,7 +8,7 @@ from weasyprint import HTML
 from django.core.files.uploadedfile import InMemoryUploadedFile
 
 from la_metro_translations.models import (
-    Disclaimer,
+    StandardTranslations,
     TranslationFile,
     DocumentTranslation,
 )
@@ -38,12 +38,12 @@ class DocumentTranslationConverter:
             return text
 
         try:
-            disclaimer = Disclaimer.objects.get(language=language)
-        except Disclaimer.DoesNotExist:
+            pretranslated = StandardTranslations.objects.get(language=language)
+        except StandardTranslations.DoesNotExist:
             raise DocumentTranslationConverterError(
                 f"No disclaimer found for target language: {language}"
             )
-        formatted_disclaimer = f"{disclaimer.disclaimer_text}\n\n---\n\n"
+        formatted_disclaimer = f"{pretranslated.disclaimer_text}\n\n---\n\n"
         return formatted_disclaimer + text
 
     def convert_to_pdf(self) -> TranslationFile:

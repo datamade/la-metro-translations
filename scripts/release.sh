@@ -11,7 +11,6 @@ if [ `psql ${DATABASE_URL} -tAX -c "SELECT COUNT(*) FROM la_metro_translations_d
    # Define an initial data loading command here, if one exists.
    python manage.py create_initial_docs
    python manage.py loaddata \
-      la_metro_translations/fixtures/linktext.json \
-      la_metro_translations/fixtures/disclaimers.json \
+      la_metro_translations/fixtures/standardtranslations.json \
       la_metro_translations/fixtures/review_app_users.json
 fi
