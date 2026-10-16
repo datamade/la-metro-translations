@@ -682,9 +682,10 @@ class StandardTranslations(models.Model):
     language = models.CharField(
         choices=DocumentTranslation.LANGUAGE_CHOICES, unique=True
     )
-    agenda_download_text = models.TextField()
-    board_report_download_text = models.TextField()
-    disclaimer_text = models.TextField()
+    agenda_download_text = models.TextField(default="")
+    board_report_download_text = models.TextField(default="")
+    disclaimer_text = models.TextField(default="")
+    agenda_pages_2_and_3_text = models.TextField(default="")
 
     def __str__(self):
         return f"{self.get_language_display()} [{self.language}] Standard Translations"
