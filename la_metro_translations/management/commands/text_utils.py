@@ -5,6 +5,15 @@ from la_metro_translations.models import StandardTranslations
 logger = logging.getLogger(__name__)
 
 
+BOILERPLATE: dict[str, dict[str, str]] = {
+    "agenda_23": {
+        "placeholder": "<AGENDA_PAGE_2_3_PLACEHOLDER>",
+        "start": "End of Page 1\n",
+        "end": "End of Page 3\n",
+    }
+}
+
+
 def get_marker_indexes(text: str, start: str, end: str) -> tuple[int, int]:
     """
     Helper function for removing and inserting boilerplate.
@@ -52,7 +61,7 @@ def replace_inner_region_with_placeholder(
 
 
 def replace_placeholder_with_pretranslated_text(
-    text: str, placeholder: str, boilerplate_field: str, language: str
+    text: str, *, language: str, placeholder: str, boilerplate_field: str
 ) -> str:
 
     boilerplate = None

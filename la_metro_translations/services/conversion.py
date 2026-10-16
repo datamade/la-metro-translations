@@ -7,6 +7,10 @@ from weasyprint import HTML
 
 from django.core.files.uploadedfile import InMemoryUploadedFile
 
+from la_metro_translations.management.commands.text_utils import (
+    BOILERPLATE,
+    replace_placeholder_with_pretranslated_text,
+)
 from la_metro_translations.models import (
     StandardTranslations,
     TranslationFile,
@@ -30,6 +34,9 @@ class DocumentTranslationConverter:
             os.path.dirname(os.path.abspath(__file__))
             + "/../static/css/converted_docs.css"
         )
+        self.is_agenda = (
+            doc_translation.document_content.document.entity_type == "event"
+        )
 
     def _prepend_disclaimer(self, language, text):
         # All documents also get "translated" into English with no disclaimer
@@ -46,6 +53,18 @@ class DocumentTranslationConverter:
         formatted_disclaimer = f"{pretranslated.disclaimer_text}\n\n---\n\n"
         return formatted_disclaimer + text
 
+    def _replace_boilerplate(self, language, text):
+        for key, value in BOILERPLATE.items():
+            if ("agenda" in key and self.is_agenda) or ("agenda" not in key):
+                text = replace_placeholder_with_pretranslated_text(
+                    text,
+                    language=language,
+                    boilerplate_field=key,
+                    placeholder=value["placeholder"],
+                )
+
+        return text
+
     def convert_to_pdf(self) -> TranslationFile:
         md_text = self.doc_translation.markdown or ""
 
@@ -54,6 +73,7 @@ class DocumentTranslationConverter:
 
         language = self.doc_translation.language
         md_text = self._prepend_disclaimer(language, md_text)
+        md_text = self._replace_boilerplate(language, md_text)
 
         try:
             # Pypandoc requires PDFs to be written to the filesystem so
@@ -119,8 +139,7 @@ class DocumentTranslationConverter:
         language = str(self.doc_translation.language)
         image_removed_text = IMAGE_REMOVED_MAP[language]
         metro_logo_text = METRO_LOGO_MAP[language]
-        entity_type = self.doc_translation.document_content.document.entity_type
-        if entity_type == "event":
+        if self.is_agenda:
             return re.sub(
                 r"!\[(.*?)\]\(data:image/[^)]+\)",
                 lambda m: (
