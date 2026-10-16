@@ -12,6 +12,7 @@ from la_metro_translations.models import (
 from la_metro_translations.services import get_translation_service
 from la_metro_translations.management.commands.utils import ConnManagerMixin
 from la_metro_translations.management.commands.text_utils import (
+    BoilerplateError,
     replace_inner_region_with_placeholder,
     BOILERPLATE,
 )
@@ -71,9 +72,16 @@ class Command(BaseCommand, ConnManagerMixin):
             # Remove page 2 and 3 of event agendas
             if content.document.get_entity_type_display() == "Event":
                 md_text = content.markdown
-                content.markdown = replace_inner_region_with_placeholder(
-                    md_text, **BOILERPLATE["agenda_23"]
-                )
+                try:
+                    content.markdown = replace_inner_region_with_placeholder(
+                        md_text, **BOILERPLATE["agenda_pages_2_and_3"]
+                    )
+                except BoilerplateError as err:
+                    logger.warning(err)
+                    logger.warning(
+                        "\n boilerplate not found for document %r",
+                        content.document.document_id,
+                    )
 
         DocumentContent.objects.bulk_update(contents, ["markdown"])
 
