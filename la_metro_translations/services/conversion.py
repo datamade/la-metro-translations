@@ -1,6 +1,7 @@
 import io
 import os
 import re
+import logging
 import pypandoc
 
 from weasyprint import HTML
@@ -16,6 +17,8 @@ from la_metro_translations.models import (
     TranslationFile,
     DocumentTranslation,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class DocumentTranslationConverterError(Exception):
@@ -48,10 +51,14 @@ class DocumentTranslationConverter:
             pretranslated = StandardTranslations.objects.get(language=language)
         except StandardTranslations.DoesNotExist:
             raise DocumentTranslationConverterError(
-                f"No disclaimer found for target language: {language}"
+                f"No standard translations found for target language: {language}"
             )
-        formatted_disclaimer = f"{pretranslated.disclaimer_text}\n\n---\n\n"
-        return formatted_disclaimer + text
+        disclaimer = pretranslated.disclaimer_text
+        if disclaimer != "":
+            logger.info(f"No disclaimer found for {language}")
+            formatted_disclaimer = f"{pretranslated.disclaimer_text}\n\n---\n\n"
+            return formatted_disclaimer + text
+        return text
 
     def _replace_boilerplate(self, language, text):
         for key, value in BOILERPLATE.items():
