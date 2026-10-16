@@ -1,6 +1,7 @@
 setup:
   addons:
     - plan: heroku-postgresql
+    - plan: heroku-redis
 build:
   docker:
     web: Dockerfile.deploy
@@ -10,3 +11,7 @@ release:
   image: web
 run:
   web: gunicorn -t 180 -w 3 --log-level debug la_metro_translations.wsgi:application
+  worker:
+    command:
+      - celery -A la_metro_translations worker -n celery@$DYNO --loglevel=info --concurrency=2
+    image: web

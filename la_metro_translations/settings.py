@@ -9,6 +9,7 @@ https://docs.djangoproject.com/en/stable/ref/settings/
 """
 
 import os
+import ssl
 import sys
 
 import dj_database_url
@@ -100,6 +101,12 @@ INSTALLED_APPS = [
     "taggit",
     "django_filters",
     "webpack_loader",
+    "dj_control_room_base",
+    "dj_redis_panel",
+    "dj_celery_panel",
+    "dj_signals_panel",
+    "dj_control_room",
+    "django_celery_results",
     "la_metro_translations",
     "storages",
     "wagtailmarkdown",
@@ -170,6 +177,23 @@ CACHES = {
         "TIMEOUT": 30,
     }
 }
+
+# Celery
+# https://docs.celeryq.dev/en/stable/django/first-steps-with-django.html
+
+CELERY_BROKER_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
+CELERY_TASK_ALWAYS_EAGER = os.getenv("CELERY_TASK_ALWAYS_EAGER") == "True"
+CELERY_TASK_EAGER_PROPAGATES = CELERY_TASK_ALWAYS_EAGER
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+
+# Store task results in Postgres so they appear in the Django Control Room
+CELERY_RESULT_BACKEND = "django-db"
+CELERY_RESULT_EXTENDED = True
+CELERY_TASK_TRACK_STARTED = True
+
+# Heroku Key-Value Store uses TLS with a self-signed certificate
+if CELERY_BROKER_URL.startswith("rediss://"):
+    CELERY_BROKER_USE_SSL = {"ssl_cert_reqs": ssl.CERT_NONE}
 
 # Password validation
 # https://docs.djangoproject.com/en/stable/ref/settings/#auth-password-validators
