@@ -13,6 +13,7 @@ from la_metro_translations.services import get_translation_service
 from la_metro_translations.management.commands.utils import ConnManagerMixin
 from la_metro_translations.management.commands.text_utils import (
     replace_inner_region_with_placeholder,
+    BOILERPLATE,
 )
 
 logger = logging.getLogger(__name__)
@@ -64,14 +65,6 @@ class Command(BaseCommand, ConnManagerMixin):
 
         Pre-translated boilerplate will be re-inserted in the conversion step.
         """
-
-        BOILERPLATE = {
-            "agenda_23": {
-                "placeholder": "<AGENDA_PAGE_2_3_PLACEHOLDER>",
-                "start": "End of Page 1\n",
-                "end": "End of Page 3\n",
-            }
-        }
 
         for content in contents:
 
