@@ -1,14 +1,17 @@
 import pytest
-from la_metro_translations.management.commands.batch_translate import (
+from la_metro_translations.management.commands.text_utils import (
+    BOILERPLATE,
     replace_inner_region_with_placeholder,
+    replace_placeholder_with_pretranslated_text,
 )
 
 
-class TestReplaceInnerRegion:
+@pytest.fixture
+def markdown(make_document_pages):
+    return make_document_pages(5)
 
-    @pytest.fixture(autouse=True)
-    def markdown(self, make_document_pages):
-        return make_document_pages(5)
+
+class TestReplaceInnerRegion:
 
     def test_replace_inner_region_works_with_valid_markers(self, markdown):
         result = replace_inner_region_with_placeholder(
@@ -72,3 +75,45 @@ class TestReplaceInnerRegion:
 
         assert "PLACEHOLDER" not in result
         assert result == markdown
+
+
+class TestReplacePlaceholder:
+
+    boilerplate_field = "agenda_pages_2_and_3_text"
+    boilerplate_info = BOILERPLATE[boilerplate_field]
+
+    @pytest.fixture
+    def placeholdered(self, markdown):
+        return replace_inner_region_with_placeholder(markdown, **self.boilerplate_info)
+
+    @pytest.mark.django_db
+    def test_replace_placeholder_with_valid_markers_and_existing_translation(
+        self, placeholdered, standard_translations
+    ):
+        pretranslated = standard_translations
+        placeholder = self.boilerplate_info["placeholder"]
+        output = replace_placeholder_with_pretranslated_text(
+            placeholdered,
+            language="spa",
+            placeholder=placeholder,
+            boilerplate_field=self.boilerplate_field,
+        )
+
+        assert placeholder not in output
+        assert getattr(pretranslated, self.boilerplate_field) in output
+
+    @pytest.mark.django_db
+    def test_replace_placeholder_with_valid_markers_and_no_translation(
+        self, placeholdered, standard_translations
+    ):
+        pretranslated = standard_translations
+        placeholder = self.boilerplate_info["placeholder"]
+        output = replace_placeholder_with_pretranslated_text(
+            placeholdered,
+            language="spa",
+            placeholder=placeholder,
+            boilerplate_field=self.boilerplate_field,
+        )
+
+        assert placeholder not in output
+        assert getattr(pretranslated, self.boilerplate_field) in output
