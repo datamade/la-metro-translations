@@ -1,6 +1,5 @@
 # Utility functions for removing and inserting boilerplate text before and after translation.
 import logging
-from la_metro_translations.models import StandardTranslations
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +36,7 @@ def unique_index(text: str, token: str) -> int:
 
 def get_marker_indexes(text: str, start: str, end: str) -> tuple[int, int]:
     """
-    Helper function for removing and inserting boilerplate.
+    Helper function for removing boilerplate.
 
     Returns the positions of start and end markers, assuming they are unique
     strings within the given text, and that start comes before end. Complains if
@@ -48,7 +47,7 @@ def get_marker_indexes(text: str, start: str, end: str) -> tuple[int, int]:
     end_index = unique_index(text, end)
 
     if end_index < start_index:
-        raise ValueError(f"{end!r} appears before {start!r}")
+        raise BoilerplateError(f"{end!r} appears before {start!r}")
 
     return start_index, end_index
 
@@ -58,43 +57,33 @@ def replace_inner_region_with_placeholder(
 ) -> str:
     """
     Use to strip out boilerplate before translation and mark for replacement before
-    conversion.
+    conversion (convert_docs).
 
-    Deleted inner region excludes start string but includes end string.
+    Deleted inner region excludes start string and includes end string.
 
-    If get_marker_indexes returns an error, log error and proceed, returning
-    original text as before. Insert placeholder only if no error.
+    If get_marker_indexes returns an error, propagate to caller to handle.
+    Insert placeholder only if no error.
     """
 
-    try:
-        start_index, end_index = get_marker_indexes(text, start, end)
-        before = text[: start_index + len(start)]  # don't cut out start string
-        after = text[end_index + len(end) :]  # do cut out end string
-        return before + placeholder + after
-
-    except ValueError as err:
-        logger.error(err)
-        return text
+    start_index, end_index = get_marker_indexes(text, start, end)
+    before = text[: start_index + len(start)]  # don't cut out start string
+    after = text[end_index + len(end) :]  # do cut out end string
+    return before + placeholder + after
 
 
 def replace_placeholder_with_pretranslated_text(
-    text: str, *, language: str, placeholder: str, boilerplate_field: str
+    text: str, *, boilerplate: str, placeholder: str
 ) -> str:
+    """
+    Find placeholder and replace it with pretranslated text.
 
-    boilerplate = None
+    If the placeholder is not found in the original text, error from unique_index()
+    propagates to caller for handling.
+    """
+
     start_index = unique_index(text, placeholder)
     end_index = start_index + len(placeholder)
     before = text[:start_index]
     after = text[end_index:]
-
-    try:
-        pretranslated = StandardTranslations.objects.filter(language=language)
-        boilerplate = getattr(pretranslated, boilerplate_field)
-
-    except StandardTranslations.DoesNotExist as e:
-        raise Exception("No standard translations exist for this language") from e
-
-    if boilerplate is None:
-        raise Exception("No replacement boilerplate found")
 
     return before + boilerplate + after

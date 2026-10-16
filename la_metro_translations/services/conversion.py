@@ -10,6 +10,7 @@ from django.core.files.uploadedfile import InMemoryUploadedFile
 
 from la_metro_translations.management.commands.text_utils import (
     BOILERPLATE,
+    BoilerplateError,
     replace_placeholder_with_pretranslated_text,
 )
 from la_metro_translations.models import (
@@ -61,14 +62,34 @@ class DocumentTranslationConverter:
         return text
 
     def _replace_boilerplate(self, language, text):
+
         for key, value in BOILERPLATE.items():
+
+            try:
+                pretranslated = StandardTranslations.objects.get(language=language)
+                boilerplate = getattr(pretranslated, key)
+                if boilerplate == "":  # fields default to ""
+                    raise DocumentTranslationConverterError(
+                        f"No replacement boilerplate found for {language} {key}"
+                    )
+
+            except StandardTranslations.DoesNotExist:
+                logger.error(f"No standard translations exist for {language}")
+                raise
+
             if ("agenda" in key and self.is_agenda) or ("agenda" not in key):
-                text = replace_placeholder_with_pretranslated_text(
-                    text,
-                    language=language,
-                    boilerplate_field=key,
-                    placeholder=value["placeholder"],
-                )
+                try:
+                    text = replace_placeholder_with_pretranslated_text(
+                        text,
+                        boilerplate=boilerplate,
+                        placeholder=value["placeholder"],
+                    )
+                except BoilerplateError as err:
+                    logger.warning(err)
+                    logger.warning(
+                        "Could not find placeholder %r in document. Did not insert pretranslated text.",
+                        value["placeholder"],
+                    )
 
         return text
 
