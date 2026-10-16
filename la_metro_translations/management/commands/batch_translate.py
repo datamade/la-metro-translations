@@ -66,7 +66,11 @@ class Command(BaseCommand, ConnManagerMixin):
 
         user_language = options["language"].title()
         user_language_value = next(  # ie. "spa"
-            (lang[0] for lang in supported_languages if lang[1] == user_language),
+            (
+                value
+                for value, display in supported_languages
+                if display == user_language
+            ),
             None,
         )
         if not user_language_value:
