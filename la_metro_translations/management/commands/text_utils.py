@@ -5,6 +5,14 @@ from la_metro_translations.models import StandardTranslations
 logger = logging.getLogger(__name__)
 
 
+class BoilerplateError(ValueError):
+    """
+    Error class for identifying issues detecting unique markers in the text,
+    including boundary markers for boilerplate text to be removed, and placeholder text to
+    be replaced.
+    """
+
+
 BOILERPLATE: dict[str, dict[str, str]] = {
     "agenda_pages_2_and_3_text": {
         "placeholder": "<AGENDA_PAGE_2_3_PLACEHOLDER>",
@@ -12,6 +20,19 @@ BOILERPLATE: dict[str, dict[str, str]] = {
         "end": "End of Page 3\n\n",
     }
 }
+
+
+def unique_index(text: str, token: str) -> int:
+    """
+    Find the starting index of a given token with a stretch of text.
+    Raise an error if the token is not unique.
+    """
+    count = text.count(token)
+    if count != 1:
+        raise BoilerplateError(
+            f"Expected exactly one instance of {token!r}, found {count}"
+        )
+    return text.index(token)
 
 
 def get_marker_indexes(text: str, start: str, end: str) -> tuple[int, int]:
@@ -22,13 +43,9 @@ def get_marker_indexes(text: str, start: str, end: str) -> tuple[int, int]:
     strings within the given text, and that start comes before end. Complains if
     either of these assumptions don't hold.
     """
-    for marker in (start, end):
-        count = text.count(marker)
-        if count != 1:
-            raise ValueError(f"Expected exactly one {marker!r}, found {count}")
 
-    start_index = text.index(start)
-    end_index = text.index(end)
+    start_index = unique_index(text, start)
+    end_index = unique_index(text, end)
 
     if end_index < start_index:
         raise ValueError(f"{end!r} appears before {start!r}")
@@ -65,7 +82,7 @@ def replace_placeholder_with_pretranslated_text(
 ) -> str:
 
     boilerplate = None
-    start_index = text.index(placeholder)
+    start_index = unique_index(text, placeholder)
     end_index = start_index + len(placeholder)
     before = text[:start_index]
     after = text[end_index:]
