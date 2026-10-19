@@ -14,7 +14,7 @@ class BoilerplateError(ValueError):
 
 BOILERPLATE: dict[str, dict[str, str]] = {
     "agenda_pages_2_and_3_text": {
-        "placeholder": "<AGENDA_PAGE_2_3_PLACEHOLDER>",
+        "placeholder": "<AGENDA_PAGE_2_3_PLACEHOLDER>\n\n",
         "start": "End of Page 1\n\n",
         "end": "End of Page 3\n\n",
     }
