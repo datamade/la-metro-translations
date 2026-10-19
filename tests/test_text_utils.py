@@ -52,8 +52,8 @@ class TestReplaceInnerRegion:
                 end="End of Page 6",
             )
 
-            assert "exactly one instance" in str(excinfo.value)
-            assert "0" in str(excinfo.value)
+        assert "exactly one instance" in str(excinfo.value)
+        assert "0" in str(excinfo.value)
 
     def test_replace_inner_region_with_non_unique_markers(self, markdown):
         with pytest.raises(BoilerplateError) as excinfo:
@@ -64,11 +64,11 @@ class TestReplaceInnerRegion:
                 end="End of Page 4",
             )
 
-            assert "exactly one instance" in str(excinfo.value)
-            assert "5" in str(excinfo.value)
+        assert "exactly one instance" in str(excinfo.value)
+        assert "5" in str(excinfo.value)
 
     def test_replace_inner_region_with_out_of_order_markers(self, markdown):
-        with pytest.raises(BoilerplateError) as excinfo:
+        with pytest.raises(BoilerplateError, match="appears before"):
 
             replace_inner_region_with_placeholder(
                 markdown,
@@ -76,8 +76,6 @@ class TestReplaceInnerRegion:
                 start="End of Page 3",
                 end="End of Page 1",
             )
-
-            assert "appears before" in str(excinfo.value)
 
 
 class TestReplacePlaceholder:
@@ -110,5 +108,5 @@ class TestReplacePlaceholder:
                 boilerplate="it translated the placeholder into spanish :(",
             )
 
-            assert "exactly one instance" in str(excinfo.value)
-            assert "0" in str(excinfo.value)
+        assert "exactly one instance" in str(excinfo.value)
+        assert "0" in str(excinfo.value)
