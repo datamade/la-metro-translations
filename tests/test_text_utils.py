@@ -1,6 +1,6 @@
 import pytest
 from la_metro_translations.management.commands.text_utils import (
-    BOILERPLATE,
+    BoilerplateError,
     replace_inner_region_with_placeholder,
     replace_placeholder_with_pretranslated_text,
 )
@@ -44,76 +44,71 @@ class TestReplaceInnerRegion:
             assert str not in result
 
     def test_replace_inner_region_with_missing_marker(self, markdown):
-        result = replace_inner_region_with_placeholder(
-            markdown,
-            placeholder="PLACEHOLDER",
-            start="End of Page 1\n\n",
-            end="End of Page 6",
-        )
+        with pytest.raises(BoilerplateError) as excinfo:
+            replace_inner_region_with_placeholder(
+                markdown,
+                placeholder="PLACEHOLDER",
+                start="End of Page 1\n\n",
+                end="End of Page 6",
+            )
 
-        assert "PLACEHOLDER" not in result
-        assert result == markdown
+            assert "exactly one instance" in str(excinfo.value)
+            assert "0" in str(excinfo.value)
 
     def test_replace_inner_region_with_non_unique_markers(self, markdown):
-        result = replace_inner_region_with_placeholder(
-            markdown,
-            placeholder="PLACEHOLDER",
-            start="text body for",
-            end="End of Page 4",
-        )
+        with pytest.raises(BoilerplateError) as excinfo:
+            replace_inner_region_with_placeholder(
+                markdown,
+                placeholder="PLACEHOLDER",
+                start="text body for",
+                end="End of Page 4",
+            )
 
-        assert "PLACEHOLDER" not in result
-        assert result == markdown
+            assert "exactly one instance" in str(excinfo.value)
+            assert "5" in str(excinfo.value)
 
     def test_replace_inner_region_with_out_of_order_markers(self, markdown):
-        result = replace_inner_region_with_placeholder(
-            markdown,
-            placeholder="PLACEHOLDER",
-            start="End of Page 3",
-            end="End of Page 1",
-        )
+        with pytest.raises(BoilerplateError) as excinfo:
 
-        assert "PLACEHOLDER" not in result
-        assert result == markdown
+            replace_inner_region_with_placeholder(
+                markdown,
+                placeholder="PLACEHOLDER",
+                start="End of Page 3",
+                end="End of Page 1",
+            )
+
+            assert "appears before" in str(excinfo.value)
 
 
 class TestReplacePlaceholder:
 
-    boilerplate_field = "agenda_pages_2_and_3_text"
-    boilerplate_info = BOILERPLATE[boilerplate_field]
+    PLACEHOLDER = "<PLACEHOLDER>"
 
     @pytest.fixture
     def placeholdered(self, markdown):
-        return replace_inner_region_with_placeholder(markdown, **self.boilerplate_info)
-
-    @pytest.mark.django_db
-    def test_replace_placeholder_with_valid_markers_and_existing_translation(
-        self, placeholdered, standard_translations
-    ):
-        pretranslated = standard_translations
-        placeholder = self.boilerplate_info["placeholder"]
-        output = replace_placeholder_with_pretranslated_text(
-            placeholdered,
-            language="spa",
-            placeholder=placeholder,
-            boilerplate_field=self.boilerplate_field,
+        return replace_inner_region_with_placeholder(
+            markdown,
+            start="End of Page 1\n\n",
+            end="End of Page 3\n\n",
+            placeholder=self.PLACEHOLDER,
         )
 
-        assert placeholder not in output
-        assert getattr(pretranslated, self.boilerplate_field) in output
-
-    @pytest.mark.django_db
-    def test_replace_placeholder_with_valid_markers_and_no_translation(
-        self, placeholdered, standard_translations
-    ):
-        pretranslated = standard_translations
-        placeholder = self.boilerplate_info["placeholder"]
+    def test_replace_placeholder_with_placeholder_found(self, placeholdered):
+        boilerplate = "this is some boilerplate"
         output = replace_placeholder_with_pretranslated_text(
-            placeholdered,
-            language="spa",
-            placeholder=placeholder,
-            boilerplate_field=self.boilerplate_field,
+            placeholdered, placeholder=self.PLACEHOLDER, boilerplate=boilerplate
         )
 
-        assert placeholder not in output
-        assert getattr(pretranslated, self.boilerplate_field) in output
+        assert self.PLACEHOLDER not in output
+        assert boilerplate in output
+
+    def test_replace_placeholder_with_no_placeholder_found(self, placeholdered):
+        with pytest.raises(BoilerplateError) as excinfo:
+            replace_placeholder_with_pretranslated_text(
+                placeholdered,
+                placeholder="<MARCADOR DE POSICIÓN>",
+                boilerplate="it translated the placeholder into spanish :(",
+            )
+
+            assert "exactly one instance" in str(excinfo.value)
+            assert "0" in str(excinfo.value)
