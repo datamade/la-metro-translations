@@ -77,7 +77,7 @@ class DocumentTranslationConverter:
                 logger.error(f"No standard translations exist for {language}")
                 raise
 
-            if ("agenda" in key and self.is_agenda) or ("agenda" not in key):
+            if "agenda_pages_2_and_3" in key and self.is_agenda:
                 try:
                     text = replace_placeholder_with_pretranslated_text(
                         text,
@@ -87,9 +87,11 @@ class DocumentTranslationConverter:
                 except BoilerplateError as err:
                     logger.warning(err)
                     logger.warning(
-                        "Could not find placeholder %r in document. Did not insert pretranslated text.",
+                        "Could not find placeholder %r in document. Agenda pages 2 and 3"
+                        "appended to beginning of the document instead.",
                         value["placeholder"],
                     )
+                    text = boilerplate + text
 
         return text
 
