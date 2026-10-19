@@ -14,7 +14,10 @@ from conftest import (
     TranslationConfigFactory,
 )
 
-from la_metro_translations.management.commands.text_utils import AGENDA_2_3_PLACEHOLDER
+from la_metro_translations.management.commands.text_utils import (
+    BOILERPLATE,
+    BoilerplateError,
+)
 from la_metro_translations.models import (
     DocumentContent,
     DocumentTranslation,
@@ -116,11 +119,27 @@ class TestBatchTranslateCommand:
         agenda_content.refresh_from_db()
         report_content.refresh_from_db()
 
-        print(agenda_content.markdown)
-        print(report_content.markdown)
-        assert AGENDA_2_3_PLACEHOLDER in agenda_content.markdown
+        assert (
+            BOILERPLATE["agenda_pages_2_and_3_text"]["placeholder"]
+            in agenda_content.markdown
+        )
         assert "End of Page 2" not in agenda_content.markdown
         assert "End of Page 2" in report_content.markdown
+
+    @patch(PATCH_EXTRACT_CALL_COMMAND)
+    def test_remove_boilerplate_errors_out_when_page_markers_not_found(
+        self, _mock_call_command, make_document_pages
+    ):
+        markdown = make_document_pages(1)
+        agenda = DocumentFactory(entity_type="event", document_id="888")
+        DocumentContentFactory(document=agenda, markdown=markdown)
+
+        with pytest.raises(BoilerplateError) as excinfo:
+            run_command("batch_translate", "Spanish")
+
+        assert "Expected exactly one instance" in str(excinfo.value.__cause__)
+        assert "0" in str(excinfo.value.__cause__)
+        assert "End of page markers not found" in str(excinfo.value)
 
     @pytest.mark.parametrize(
         "approval_status,expect_convert_docs",

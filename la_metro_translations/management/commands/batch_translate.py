@@ -74,15 +74,13 @@ class Command(BaseCommand, ConnManagerMixin):
                 md_text = content.markdown
                 try:
                     content.markdown = replace_inner_region_with_placeholder(
-                        md_text, **BOILERPLATE["agenda_pages_2_and_3"]
+                        md_text, **BOILERPLATE["agenda_pages_2_and_3_text"]
                     )
                 except BoilerplateError as err:
-                    logger.warning(err)
-                    logger.warning(
-                        "\n End of page markers not found for document %r",
-                        content.document.document_id,
-                    )
-                    raise
+                    raise BoilerplateError(
+                        "\n End of page markers not found for document %r"
+                        % content.document.document_id
+                    ) from err
 
         DocumentContent.objects.bulk_update(contents, ["markdown"])
 
