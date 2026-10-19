@@ -79,9 +79,10 @@ class Command(BaseCommand, ConnManagerMixin):
                 except BoilerplateError as err:
                     logger.warning(err)
                     logger.warning(
-                        "\n boilerplate not found for document %r",
+                        "\n End of page markers not found for document %r",
                         content.document.document_id,
                     )
+                    raise
 
         DocumentContent.objects.bulk_update(contents, ["markdown"])
 
