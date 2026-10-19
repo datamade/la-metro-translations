@@ -2,6 +2,7 @@ import io
 import os
 import re
 import logging
+from django.db.models import QuerySet
 import pypandoc
 
 from weasyprint import HTML
@@ -14,7 +15,6 @@ from la_metro_translations.management.commands.text_utils import (
     replace_placeholder_with_pretranslated_text,
 )
 from la_metro_translations.models import (
-    StandardTranslations,
     TranslationFile,
     DocumentTranslation,
 )
@@ -27,7 +27,9 @@ class DocumentTranslationConverterError(Exception):
 
 
 class DocumentTranslationConverter:
-    def __init__(self, doc_translation: DocumentTranslation):
+    def __init__(
+        self, doc_translation: DocumentTranslation, standard_translations: QuerySet
+    ):
         if not isinstance(doc_translation, DocumentTranslation):
             raise DocumentTranslationConverterError(
                 "Must pass a DocumentTranslation instance."
@@ -41,6 +43,7 @@ class DocumentTranslationConverter:
         self.is_agenda = (
             doc_translation.document_content.document.entity_type == "event"
         )
+        self.standard_translations = standard_translations
 
     def _prepend_disclaimer(self, language, text):
         # All documents also get "translated" into English with no disclaimer
@@ -49,15 +52,16 @@ class DocumentTranslationConverter:
             return text
 
         try:
-            pretranslated = StandardTranslations.objects.get(language=language)
-        except StandardTranslations.DoesNotExist:
+            pretranslated = self.standard_translations.get(language=language)
+        except self.standard_translations.DoesNotExist:
             raise DocumentTranslationConverterError(
                 f"No standard translations found for target language: {language}"
             )
-        disclaimer = pretranslated.disclaimer_text
+
+        disclaimer = pretranslated["disclaimer_text"]
         if disclaimer != "":
             logger.info(f"No disclaimer found for {language}")
-            formatted_disclaimer = f"{pretranslated.disclaimer_text}\n\n---\n\n"
+            formatted_disclaimer = f"{disclaimer}\n\n---\n\n"
             return formatted_disclaimer + text
         return text
 
@@ -66,16 +70,17 @@ class DocumentTranslationConverter:
         for key, value in BOILERPLATE.items():
 
             try:
-                pretranslated = StandardTranslations.objects.get(language=language)
+                pretranslated = self.standard_translations.get(language=language)
                 boilerplate = getattr(pretranslated, key)
                 if boilerplate == "":  # fields default to ""
                     raise DocumentTranslationConverterError(
                         f"No replacement boilerplate found for {language} {key}"
                     )
 
-            except StandardTranslations.DoesNotExist:
-                logger.error(f"No standard translations exist for {language}")
-                raise
+            except self.standard_translations.DoesNotExist:
+                raise DocumentTranslationConverterError(
+                    f"No standard translations exist for target language: {language}"
+                )
 
             if "agenda_pages_2_and_3" in key and self.is_agenda:
                 try:
