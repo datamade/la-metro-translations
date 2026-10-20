@@ -72,8 +72,9 @@ class Command(BaseCommand, ConnManagerMixin):
             # Remove page 2 and 3 of event agendas
             if content.document.get_entity_type_display() == "Event":
                 md_text = content.markdown
+
                 try:
-                    content.markdown = replace_inner_region_with_placeholder(
+                    content.processed = replace_inner_region_with_placeholder(
                         md_text, **BOILERPLATE["agenda_pages_2_and_3_text"]
                     )
                 except BoilerplateError as err:
@@ -82,7 +83,7 @@ class Command(BaseCommand, ConnManagerMixin):
                         % content.document.document_id
                     ) from err
 
-        DocumentContent.objects.bulk_update(contents, ["markdown"])
+        DocumentContent.objects.bulk_update(contents, ["processed"])
 
     def handle(self, **options):
         approval_status = options["approval_status"]

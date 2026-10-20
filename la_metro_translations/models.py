@@ -174,7 +174,17 @@ class DocumentContent(AdminDisplayMixin, models.Model):
         ("revision", "Needs Revision"),
     ]
 
-    markdown = MarkdownField()
+    markdown = MarkdownField(
+        help_text="This is the markdown as received from OCR service"
+        "with non-content-based post-processing, for example, the addition "
+        "of page markers."
+    )
+    processed = MarkdownField(
+        help_text="This is the markdown that will be sent for translation, "
+        "with its text content possibly changed from the markdown field. "
+        "For instance, boilerplate text may have been removed.",
+        default="",
+    )
     approval_status = models.CharField(
         choices=APPROVAL_STATUS_CHOICES, default="waiting"
     )
@@ -685,7 +695,7 @@ class StandardTranslations(models.Model):
     agenda_download_text = models.TextField(default="")
     board_report_download_text = models.TextField(default="")
     disclaimer_text = models.TextField(default="")
-    agenda_pages_2_and_3_text = models.TextField(default="")
+    agenda_pages_2_and_3_text = MarkdownField(default="")
 
     def __str__(self):
         return f"{self.get_language_display()} [{self.language}] Standard Translations"
