@@ -119,12 +119,16 @@ class TestBatchTranslateCommand:
         agenda_content.refresh_from_db()
         report_content.refresh_from_db()
 
-        assert (
-            BOILERPLATE["agenda_pages_2_and_3_text"]["placeholder"]
-            in agenda_content.markdown
-        )
-        assert "End of Page 2" not in agenda_content.markdown
+        placeholder = BOILERPLATE["agenda_pages_2_and_3_text"]["placeholder"]
+        assert placeholder in agenda_content.processed
+        assert placeholder not in agenda_content.markdown
+        assert "End of Page 2" not in agenda_content.processed
+        assert "End of Page 2" in agenda_content.markdown
+
+        assert "End of Page 2" in report_content.processed
         assert "End of Page 2" in report_content.markdown
+        assert placeholder not in report_content.processed
+        assert placeholder not in report_content.markdown
 
     @patch(PATCH_EXTRACT_CALL_COMMAND)
     def test_remove_boilerplate_errors_out_when_page_markers_not_found(
