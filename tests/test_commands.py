@@ -219,6 +219,7 @@ class TestBatchTranslateCommand:
         This case would only happen if a document produces more than 10 chunks.
         """
         document_content.markdown = make_document_pages(55)
+        document_content.processed = document_content.markdown
         document_content.save()
 
         doc = document_content.document
@@ -260,6 +261,7 @@ class TestBatchTranslateCommand:
         return all chunks from a single document, instead of creating an incomplete one.
         """
         document_content.markdown = make_document_pages(10)
+        document_content.processed = document_content.markdown
         document_content.save()
 
         doc = document_content.document
