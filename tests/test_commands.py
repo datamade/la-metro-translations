@@ -60,6 +60,18 @@ PATCH_CHECK_BATCH_JOB = (
 )
 
 
+@pytest.fixture(autouse=True)
+def no_reset_db_translate():
+    with patch(PATCH_TRANSLATE_RESET_DB):
+        yield
+
+
+@pytest.fixture(autouse=True)
+def no_reset_db_convert():
+    with patch(PATCH_CONVERT_RESET_DB):
+        yield
+
+
 @pytest.mark.django_db
 class TestBatchTranslateCommand:
     """
@@ -67,11 +79,6 @@ class TestBatchTranslateCommand:
     --approval_status argument controls translation status and whether
     convert_docs is triggered.
     """
-
-    @pytest.fixture(autouse=True)
-    def no_reset_db(self):
-        with patch(PATCH_TRANSLATE_RESET_DB):
-            yield
 
     @pytest.fixture(autouse=True)
     def mock_translate_service(self, document_content):
@@ -100,50 +107,6 @@ class TestBatchTranslateCommand:
             document_content=document_content, language="spa"
         )
         assert translation.approval_status == approval_status
-
-    @patch(PATCH_EXTRACT_CALL_COMMAND)
-    def test_remove_boilerplace_selects_agenda_and_persists_in_db(
-        self, _mock_call_command, make_document_pages
-    ):
-        markdown = make_document_pages(5)
-        agenda = DocumentFactory(entity_type="event", document_id="888")
-        report = DocumentFactory(entity_type="bill", document_id="889")
-        agenda_content = DocumentContentFactory(document=agenda, markdown=markdown)
-        report_content = DocumentContentFactory(document=report, markdown=markdown)
-
-        run_command(
-            "batch_translate",
-            "Spanish",
-        )
-
-        agenda_content.refresh_from_db()
-        report_content.refresh_from_db()
-
-        placeholder = BOILERPLATE["agenda_pages_2_and_3_text"]["placeholder"]
-        assert placeholder in agenda_content.processed
-        assert placeholder not in agenda_content.markdown
-        assert "End of Page 2" not in agenda_content.processed
-        assert "End of Page 2" in agenda_content.markdown
-
-        assert "End of Page 2" in report_content.processed
-        assert "End of Page 2" in report_content.markdown
-        assert placeholder not in report_content.processed
-        assert placeholder not in report_content.markdown
-
-    @patch(PATCH_EXTRACT_CALL_COMMAND)
-    def test_remove_boilerplate_errors_out_when_page_markers_not_found(
-        self, _mock_call_command, make_document_pages
-    ):
-        markdown = make_document_pages(1)
-        agenda = DocumentFactory(entity_type="event", document_id="888")
-        DocumentContentFactory(document=agenda, markdown=markdown)
-
-        with pytest.raises(BoilerplateError) as excinfo:
-            run_command("batch_translate", "Spanish")
-
-        assert "Expected exactly one instance" in str(excinfo.value.__cause__)
-        assert "0" in str(excinfo.value.__cause__)
-        assert "End of page markers not found" in str(excinfo.value)
 
     @pytest.mark.parametrize(
         "approval_status,expect_convert_docs",
@@ -421,11 +384,6 @@ class TestConvertDocsCommand:
     and PDFs for all non-English DocumentTranslations with out-of-date PDFs.
     """
 
-    @pytest.fixture(autouse=True)
-    def no_reset_db(self):
-        with patch(PATCH_CONVERT_RESET_DB):
-            yield
-
     @pytest.fixture
     def doc_id_counter(self):
         counter = itertools.count(1)
@@ -548,3 +506,91 @@ class TestConvertDocsCommand:
 
         mock_converter.convert_to_rtf.assert_called_once()
         mock_converter.convert_to_pdf.assert_called_once()
+
+
+@pytest.mark.django_db
+class TestAgendaPagesRemovalAndReplacement:
+
+    placeholder = BOILERPLATE["agenda_pages_2_and_3_text"]["placeholder"]
+
+    @pytest.fixture
+    def boilerplate(self, standard_translations):
+        return standard_translations.get(language="spa").agenda_pages_2_and_3_text
+
+    @pytest.fixture
+    def agenda(self):
+        return DocumentFactory(entity_type="event", document_id="888")
+
+    @pytest.fixture
+    def report(self):
+        return DocumentFactory(entity_type="bill", document_id="889")
+
+    @patch(PATCH_EXTRACT_CALL_COMMAND)
+    def test_remove_boilerplace_selects_agenda_and_persists_in_db(
+        self, _mock_call_command, make_document_pages, agenda, report
+    ):
+
+        markdown = make_document_pages(5)
+        agenda_content = DocumentContentFactory(document=agenda, markdown=markdown)
+        report_content = DocumentContentFactory(document=report, markdown=markdown)
+
+        run_command(
+            "batch_translate",
+            "Spanish",
+        )
+
+        agenda_content.refresh_from_db()
+        report_content.refresh_from_db()
+
+        # Agenda processed is modified
+        assert self.placeholder in agenda_content.processed
+        assert "End of Page 2" not in agenda_content.processed
+
+        # Agenda markdown remains untouched
+        assert self.placeholder not in agenda_content.markdown
+        assert "End of Page 2" in agenda_content.markdown
+
+        # Report markdown and processed are both untouched
+        assert "End of Page 2" in report_content.processed
+        assert "End of Page 2" in report_content.markdown
+        assert self.placeholder not in report_content.processed
+        assert self.placeholder not in report_content.markdown
+
+    @patch(PATCH_EXTRACT_CALL_COMMAND)
+    def test_remove_boilerplate_errors_out_when_page_markers_not_found(
+        self, _mock_call_command, make_document_pages, agenda
+    ):
+        markdown = make_document_pages(1)
+        DocumentContentFactory(document=agenda, markdown=markdown)
+
+        with pytest.raises(BoilerplateError) as excinfo:
+            run_command("batch_translate", "Spanish")
+
+        assert "Expected exactly one instance" in str(excinfo.value.__cause__)
+        assert "0" in str(excinfo.value.__cause__)
+        assert "End of page markers not found" in str(excinfo.value)
+
+    def test_convert_doc_inserts_agenda_pages_2_and_3_boilerplate(
+        self, make_translation, mock_converter, placeholder_newline
+    ):
+
+        translation = make_translation(language="spa")
+        translation.markdown = (
+            "this is the translation\n\n"
+            f"{self.placeholder}{placeholder_newline}"
+            "this should come after the boilerplate\n\n"
+        )
+
+        run_command("convert_docs", document_translation=translation.pk)
+
+        mock_converter.convert_to_rtf.assert_called_once()
+        mock_converter.convert_to_pdf.assert_called_once()
+
+        files_qs = TranslationFile.objects.filter(document_translation=translation.pk)
+        assert len(files_qs) == 2
+
+    def test_convert_docs_inserts_agenda_pages_2_and_3_boilerplate(
+        self, make_translation, mock_converter
+    ):
+        print(make_translation, mock_converter)
+        pass
