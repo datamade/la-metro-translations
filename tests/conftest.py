@@ -90,8 +90,8 @@ class StandardTranslationsFactory(factory.django.DjangoModelFactory):
     board_report_download_text = "spa - download board report"
     disclaimer_text = "Spanish disclaimer"
     agenda_pages_2_and_3_text = (
-        "spa - AGENDA PAGE 2\n\nEnd of Page 2\n\n"
-        "spa - AGENDA PAGE 3\n\nEnd of Page 3\n\n"
+        "spa - BOILERPLATE PAGE 2\n\nEnd of Page 2\n\n"
+        "spa - BOILERPLATE PAGE 3\n\nEnd of Page 3\n\n"
     )
 
 
