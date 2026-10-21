@@ -1,6 +1,7 @@
 import itertools
 import json
 import pytest
+import re
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
@@ -520,7 +521,7 @@ class TestAgendaPagesRemovalAndReplacement:
 
     @pytest.fixture
     def boilerplate(self, standard_translations):
-        return standard_translations.get(language="spa").agenda_pages_2_and_3_text
+        return standard_translations.agenda_pages_2_and_3_text
 
     @pytest.fixture
     def agenda(self):
@@ -536,6 +537,12 @@ class TestAgendaPagesRemovalAndReplacement:
             mock_convert.return_value = "<html></html>"
 
             yield mock_convert
+
+    @pytest.fixture
+    def mock_html(self):
+        with patch(PATCH_WEASYPRINT_HTML) as mock_html:
+            mock_html.return_value.write_pdf.return_value = b"pdf"
+            yield mock_html
 
     @patch(PATCH_TRANSLATE_CALL_COMMAND)
     def test_remove_boilerplace_selects_agenda_and_persists_in_db(
@@ -569,7 +576,7 @@ class TestAgendaPagesRemovalAndReplacement:
         assert self.placeholder not in report_content.markdown
 
     def test_remove_boilerplate_errors_out_when_page_markers_not_found(
-        self, mock_call_command, make_document_pages, agenda
+        self, make_document_pages, agenda
     ):
         markdown = make_document_pages(1)
         DocumentContentFactory(document=agenda, markdown=markdown)
@@ -581,10 +588,10 @@ class TestAgendaPagesRemovalAndReplacement:
         assert "0" in str(excinfo.value.__cause__)
         assert "End of page markers not found" in str(excinfo.value)
 
-    @patch(PATCH_WEASYPRINT_HTML)
     def test_convert_doc_inserts_agenda_pages_2_and_3_boilerplate(
-        self, mock_html, mock_convert_text, standard_translations, agenda
+        self, mock_html, mock_convert_text, standard_translations, agenda, boilerplate
     ):
+
         markdown = (
             "This is the translation\n\n"
             "This should come before the boilerplate\n\n"
@@ -593,17 +600,27 @@ class TestAgendaPagesRemovalAndReplacement:
         )
 
         content = DocumentContentFactory(document=agenda)
-        translation = DocumentTranslationFactory(
-            document_content=content, markdown=markdown
-        )
-        translation.save()
+        DocumentTranslationFactory(document_content=content, markdown=markdown)
 
-        mock_html.return_value.write_pdf.return_value = b"pdf"
-        run_command("convert_docs", document_translation=translation.pk)
+        run_command("convert_docs")
 
-        print(mock_convert_text.call_args_list)
+        for call in mock_convert_text.call_args_list:
+            (text,), _kwargs = call
+            assert boilerplate in text
 
     def test_convert_docs_appends_boilerplate_when_no_placeholder_found(
-        self,
+        self, mock_convert_text, mock_html, agenda, standard_translations, boilerplate
     ):
-        pass
+
+        markdown = "There is no placeholder here in this place\n\n"
+
+        content = DocumentContentFactory(document=agenda)
+        DocumentTranslationFactory(document_content=content, markdown=markdown)
+
+        run_command("convert_docs")
+
+        for call in mock_convert_text.call_args_list:
+            (text,), _kwargs = call
+            pattern = f"^{boilerplate}"
+            m = re.search(pattern, text)
+            assert m is not None
