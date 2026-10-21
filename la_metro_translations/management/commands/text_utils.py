@@ -1,7 +1,5 @@
 # Utility functions for removing and inserting boilerplate text before and after translation.
-import logging
-
-logger = logging.getLogger(__name__)
+import re
 
 
 class BoilerplateError(ValueError):
@@ -14,7 +12,7 @@ class BoilerplateError(ValueError):
 
 BOILERPLATE: dict[str, dict[str, str]] = {
     "agenda_pages_2_and_3_text": {
-        "placeholder": "<AGENDA_PAGE_2_3_PLACEHOLDER>\n\n",
+        "placeholder": "<AGENDA_PAGE_2_3_PLACEHOLDER>",
         "start": "End of Page 1\n\n",
         "end": "End of Page 3\n\n",
     }
@@ -68,7 +66,7 @@ def replace_inner_region_with_placeholder(
     start_index, end_index = get_marker_indexes(text, start, end)
     before = text[: start_index + len(start)]  # don't cut out start string
     after = text[end_index + len(end) :]  # do cut out end string
-    return before + placeholder + after
+    return before + placeholder + "\n\n" + after
 
 
 def replace_placeholder_with_pretranslated_text(
@@ -81,9 +79,11 @@ def replace_placeholder_with_pretranslated_text(
     propagates to caller for handling.
     """
 
-    start_index = unique_index(text, placeholder)
-    end_index = start_index + len(placeholder)
-    before = text[:start_index]
-    after = text[end_index:]
+    pattern = placeholder + r"[\r\n]*"
+    match = re.search(pattern, text)
+    if match is None:
+        raise BoilerplateError()
+    before = text[: match.start()]
+    after = text[match.end() :]
 
-    return before + boilerplate + after
+    return before + "\n\n --- \n\n" + boilerplate + "\n\n --- \n\n" + after

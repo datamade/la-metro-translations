@@ -84,29 +84,35 @@ class TestReplacePlaceholder:
 
     @pytest.fixture
     def placeholdered(self, markdown):
-        return replace_inner_region_with_placeholder(
-            markdown,
-            start="End of Page 1\n\n",
-            end="End of Page 3\n\n",
-            placeholder=self.PLACEHOLDER,
-        )
+        def build(line_ending="\n\n"):
+            return replace_inner_region_with_placeholder(
+                markdown,
+                start="End of Page 1\n\n",
+                end="End of Page 3\n\n",
+                placeholder=self.PLACEHOLDER + line_ending,
+            )
 
-    def test_replace_placeholder_with_placeholder_found(self, placeholdered):
+        return build
+
+    @pytest.mark.parametrize("line_endings", ["\r\n", "", "\n", "\r\n\r\n"])
+    def test_replace_placeholder_finds_placeholder_and_replaces(
+        self, placeholdered, line_endings
+    ):
+
+        text = placeholdered(line_endings)
         boilerplate = "this is some boilerplate"
         output = replace_placeholder_with_pretranslated_text(
-            placeholdered, placeholder=self.PLACEHOLDER, boilerplate=boilerplate
+            text, placeholder=self.PLACEHOLDER, boilerplate=boilerplate
         )
 
+        assert self.PLACEHOLDER + line_endings not in output
         assert self.PLACEHOLDER not in output
         assert boilerplate in output
 
     def test_replace_placeholder_with_no_placeholder_found(self, placeholdered):
-        with pytest.raises(BoilerplateError) as excinfo:
+        with pytest.raises(BoilerplateError):
             replace_placeholder_with_pretranslated_text(
-                placeholdered,
+                placeholdered(),
                 placeholder="<MARCADOR DE POSICIÓN>",
                 boilerplate="it translated the placeholder into spanish :(",
             )
-
-        assert "exactly one instance" in str(excinfo.value)
-        assert "0" in str(excinfo.value)
