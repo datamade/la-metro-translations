@@ -58,12 +58,13 @@ class DocumentTranslationConverter:
                 f"No standard translations found for target language: {language}"
             )
 
-        disclaimer = pretranslated["disclaimer_text"]
-        if disclaimer != "":
+        disclaimer = pretranslated.disclaimer_text
+        if disclaimer == "":
             logger.info(f"No disclaimer found for {language}")
+            return text
+        else:
             formatted_disclaimer = f"{disclaimer}\n\n---\n\n"
             return formatted_disclaimer + text
-        return text
 
     def _replace_boilerplate(self, language, text):
 
