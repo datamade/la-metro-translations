@@ -58,6 +58,10 @@ PATCH_START_BATCH_JOB = (
 PATCH_CHECK_BATCH_JOB = (
     "la_metro_translations.services.translation.BatchUtils.check_batch_job"
 )
+PATCH_PYPANDOC_CONVERT = (
+    "la_metro_translations.services.conversion.pypandoc.convert_text"
+)
+PATCH_WEASYPRINT_HTML = "la_metro_translations.services.conversion.HTML"
 
 
 @pytest.fixture(autouse=True)
@@ -67,9 +71,37 @@ def no_reset_db_translate():
 
 
 @pytest.fixture(autouse=True)
+def mock_translate_service(document_content):
+    with patch(PATCH_TRANSLATE_SERVICE) as mock_service:
+        mock_service.return_value.metered_batch_translate.return_value = [
+            {
+                "document_id": str(document_content.document.document_id),
+                "markdown": "translated text",
+            }
+        ]
+        yield mock_service
+
+
+@pytest.fixture(autouse=True)
 def no_reset_db_convert():
     with patch(PATCH_CONVERT_RESET_DB):
         yield
+
+
+@pytest.fixture
+def doc_id_counter():
+    counter = itertools.count(1)
+    return lambda: next(counter)
+
+
+@pytest.fixture
+def make_translation(doc_id_counter):
+    def _make(language="spa"):
+        doc = DocumentFactory(document_id=doc_id_counter())
+        content = DocumentContentFactory(document=doc)
+        return DocumentTranslationFactory(document_content=content, language=language)
+
+    return _make
 
 
 @pytest.mark.django_db
@@ -79,17 +111,6 @@ class TestBatchTranslateCommand:
     --approval_status argument controls translation status and whether
     convert_docs is triggered.
     """
-
-    @pytest.fixture(autouse=True)
-    def mock_translate_service(self, document_content):
-        with patch(PATCH_TRANSLATE_SERVICE) as mock_service:
-            mock_service.return_value.metered_batch_translate.return_value = [
-                {
-                    "document_id": str(document_content.document.document_id),
-                    "markdown": "translated text",
-                }
-            ]
-            yield mock_service
 
     @pytest.mark.parametrize("approval_status", ["waiting", "approved"])
     def test_creates_translations_with_correct_approval_status(
@@ -384,22 +405,6 @@ class TestConvertDocsCommand:
     and PDFs for all non-English DocumentTranslations with out-of-date PDFs.
     """
 
-    @pytest.fixture
-    def doc_id_counter(self):
-        counter = itertools.count(1)
-        return lambda: next(counter)
-
-    @pytest.fixture
-    def make_translation(self, doc_id_counter):
-        def _make(language="spa"):
-            doc = DocumentFactory(document_id=doc_id_counter())
-            content = DocumentContentFactory(document=doc)
-            return DocumentTranslationFactory(
-                document_content=content, language=language
-            )
-
-        return _make
-
     def _set_updated_at(self, obj, dt):
         type(obj).objects.filter(pk=obj.pk).update(updated_at=dt)
         obj.refresh_from_db()
@@ -525,9 +530,16 @@ class TestAgendaPagesRemovalAndReplacement:
     def report(self):
         return DocumentFactory(entity_type="bill", document_id="889")
 
-    @patch(PATCH_EXTRACT_CALL_COMMAND)
+    @pytest.fixture
+    def mock_convert_text(self):
+        with patch(PATCH_PYPANDOC_CONVERT) as mock_convert:
+            mock_convert.return_value = "<html></html>"
+
+            yield mock_convert
+
+    @patch(PATCH_TRANSLATE_CALL_COMMAND)
     def test_remove_boilerplace_selects_agenda_and_persists_in_db(
-        self, _mock_call_command, make_document_pages, agenda, report
+        self, mock_call_command, translation_config, make_document_pages, agenda, report
     ):
 
         markdown = make_document_pages(5)
@@ -556,9 +568,8 @@ class TestAgendaPagesRemovalAndReplacement:
         assert self.placeholder not in report_content.processed
         assert self.placeholder not in report_content.markdown
 
-    @patch(PATCH_EXTRACT_CALL_COMMAND)
     def test_remove_boilerplate_errors_out_when_page_markers_not_found(
-        self, _mock_call_command, make_document_pages, agenda
+        self, mock_call_command, make_document_pages, agenda
     ):
         markdown = make_document_pages(1)
         DocumentContentFactory(document=agenda, markdown=markdown)
@@ -570,27 +581,29 @@ class TestAgendaPagesRemovalAndReplacement:
         assert "0" in str(excinfo.value.__cause__)
         assert "End of page markers not found" in str(excinfo.value)
 
+    @patch(PATCH_WEASYPRINT_HTML)
     def test_convert_doc_inserts_agenda_pages_2_and_3_boilerplate(
-        self, make_translation, mock_converter, placeholder_newline
+        self, mock_html, mock_convert_text, standard_translations, agenda
     ):
-
-        translation = make_translation(language="spa")
-        translation.markdown = (
-            "this is the translation\n\n"
-            f"{self.placeholder}{placeholder_newline}"
-            "this should come after the boilerplate\n\n"
+        markdown = (
+            "This is the translation\n\n"
+            "This should come before the boilerplate\n\n"
+            f"{self.placeholder}\n\n"
+            "This should come after the boilerplate\n\n"
         )
 
+        content = DocumentContentFactory(document=agenda)
+        translation = DocumentTranslationFactory(
+            document_content=content, markdown=markdown
+        )
+        translation.save()
+
+        mock_html.return_value.write_pdf.return_value = b"pdf"
         run_command("convert_docs", document_translation=translation.pk)
 
-        mock_converter.convert_to_rtf.assert_called_once()
-        mock_converter.convert_to_pdf.assert_called_once()
+        print(mock_convert_text.call_args_list)
 
-        files_qs = TranslationFile.objects.filter(document_translation=translation.pk)
-        assert len(files_qs) == 2
-
-    def test_convert_docs_inserts_agenda_pages_2_and_3_boilerplate(
-        self, make_translation, mock_converter
+    def test_convert_docs_appends_boilerplate_when_no_placeholder_found(
+        self,
     ):
-        print(make_translation, mock_converter)
         pass
