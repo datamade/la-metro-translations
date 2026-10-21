@@ -51,11 +51,10 @@ class DocumentTranslationConverter:
         if language == "eng":
             return text
 
-        try:
-            pretranslated = self.standard_translations.get(language=language)
-        except self.standard_translations.DoesNotExist:
+        pretranslated = self.standard_translations.get(language=language)
+        if pretranslated is None:
             raise DocumentTranslationConverterError(
-                f"No standard translations found for target language: {language}"
+                f"No standard translations exist for target language: {language}"
             )
 
         disclaimer = pretranslated.disclaimer_text
@@ -70,17 +69,16 @@ class DocumentTranslationConverter:
 
         for key, value in BOILERPLATE.items():
 
-            try:
-                pretranslated = self.standard_translations.get(language=language)
-                boilerplate = getattr(pretranslated, key)
-                if boilerplate == "":  # fields default to ""
-                    raise DocumentTranslationConverterError(
-                        f"No replacement boilerplate found for {language} {key}"
-                    )
-
-            except self.standard_translations.DoesNotExist:
+            pretranslated = self.standard_translations.get(language=language)
+            if pretranslated is None:
                 raise DocumentTranslationConverterError(
                     f"No standard translations exist for target language: {language}"
+                )
+
+            boilerplate = getattr(pretranslated, key)
+            if boilerplate == "":  # fields default to ""
+                raise DocumentTranslationConverterError(
+                    f"No replacement boilerplate found for {language} {key}"
                 )
 
             if "agenda_pages_2_and_3" in key and self.is_agenda:
