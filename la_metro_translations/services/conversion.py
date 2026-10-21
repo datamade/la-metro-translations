@@ -13,6 +13,7 @@ from la_metro_translations.management.commands.text_utils import (
     BOILERPLATE,
     BoilerplateError,
     replace_placeholder_with_pretranslated_text,
+    HR,
 )
 from la_metro_translations.models import (
     TranslationFile,
@@ -62,7 +63,7 @@ class DocumentTranslationConverter:
             logger.info(f"No disclaimer found for {language}")
             return text
         else:
-            formatted_disclaimer = f"{disclaimer}\n\n---\n\n"
+            formatted_disclaimer = f"{disclaimer}{HR}"
             return formatted_disclaimer + text
 
     def _replace_boilerplate(self, language, text):
@@ -95,7 +96,7 @@ class DocumentTranslationConverter:
                         "appended to beginning of the document instead.",
                         value["placeholder"],
                     )
-                    text = boilerplate + text
+                    text = boilerplate + HR + text
 
         return text
 
@@ -106,8 +107,8 @@ class DocumentTranslationConverter:
         md_text = re.sub(r"!\[[^]]+\]", "![]", md_text)
 
         language = self.doc_translation.language
-        md_text = self._prepend_disclaimer(language, md_text)
         md_text = self._replace_boilerplate(language, md_text)
+        md_text = self._prepend_disclaimer(language, md_text)
 
         try:
             # Pypandoc requires PDFs to be written to the filesystem so
@@ -194,8 +195,8 @@ class DocumentTranslationConverter:
         md_text = self.insert_image_placeholder_text(md_text)
 
         language = self.doc_translation.language
-        md_text = self._prepend_disclaimer(language, md_text)
         md_text = self._replace_boilerplate(language, md_text)
+        md_text = self._prepend_disclaimer(language, md_text)
 
         try:
             output = pypandoc.convert_text(

@@ -18,6 +18,8 @@ BOILERPLATE: dict[str, dict[str, str]] = {
     }
 }
 
+HR = "\n\n---\n\n"
+
 
 def unique_index(text: str, token: str) -> int:
     """
@@ -86,4 +88,4 @@ def replace_placeholder_with_pretranslated_text(
     before = text[: match.start()]
     after = text[match.end() :]
 
-    return before + "\n\n --- \n\n" + boilerplate + "\n\n --- \n\n" + after
+    return before + HR + boilerplate + HR + after
