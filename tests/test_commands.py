@@ -1,7 +1,6 @@
 import itertools
 import json
 import pytest
-import re
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
@@ -17,6 +16,7 @@ from conftest import (
 
 from la_metro_translations.management.commands.text_utils import (
     BOILERPLATE,
+    HR,
     BoilerplateError,
 )
 from la_metro_translations.models import (
@@ -528,8 +528,8 @@ class TestAgendaPagesRemovalAndReplacement:
         return DocumentFactory(entity_type="event", document_id="888")
 
     @pytest.fixture
-    def report(self):
-        return DocumentFactory(entity_type="bill", document_id="889")
+    def disclaimer(self, standard_translations):
+        return standard_translations.disclaimer_text
 
     @pytest.fixture
     def mock_convert_text(self):
@@ -546,10 +546,12 @@ class TestAgendaPagesRemovalAndReplacement:
 
     @patch(PATCH_TRANSLATE_CALL_COMMAND)
     def test_remove_boilerplace_selects_agenda_and_persists_in_db(
-        self, mock_call_command, translation_config, make_document_pages, agenda, report
+        self, mock_call_command, translation_config, make_document_pages, agenda
     ):
 
         markdown = make_document_pages(5)
+
+        report = DocumentFactory(entity_type="bill", document_id="889")
         agenda_content = DocumentContentFactory(document=agenda, markdown=markdown)
         report_content = DocumentContentFactory(document=report, markdown=markdown)
 
@@ -589,28 +591,47 @@ class TestAgendaPagesRemovalAndReplacement:
         assert "End of page markers not found" in str(excinfo.value)
 
     def test_convert_doc_inserts_agenda_pages_2_and_3_boilerplate(
-        self, mock_html, mock_convert_text, standard_translations, agenda, boilerplate
+        self,
+        mock_html,
+        mock_convert_text,
+        standard_translations,
+        agenda,
+        boilerplate,
+        disclaimer,
     ):
+        """
+        Test that the placeholder is replaced by the boilerplate.
+        """
 
-        markdown = (
-            "This is the translation\n\n"
-            "This should come before the boilerplate\n\n"
-            f"{self.placeholder}\n\n"
-            "This should come after the boilerplate\n\n"
-        )
+        md1 = "This should come before the boilerplate\n\n"
+        md2 = f"{self.placeholder}\n\n"
+        md3 = "This should come after the boilerplate"
+
+        input = md1 + md2 + md3
+        expected = disclaimer + HR + md1 + HR + boilerplate + HR + md3
 
         content = DocumentContentFactory(document=agenda)
-        DocumentTranslationFactory(document_content=content, markdown=markdown)
+        DocumentTranslationFactory(document_content=content, markdown=input)
 
         run_command("convert_docs")
 
         for call in mock_convert_text.call_args_list:
             (text,), _kwargs = call
-            assert boilerplate in text
+            assert text == expected
 
-    def test_convert_docs_appends_boilerplate_when_no_placeholder_found(
-        self, mock_convert_text, mock_html, agenda, standard_translations, boilerplate
+    def test_convert_docs_prepends_boilerplate_when_no_placeholder_found(
+        self,
+        mock_convert_text,
+        mock_html,
+        agenda,
+        standard_translations,
+        boilerplate,
+        disclaimer,
     ):
+        """
+        Test that files without an agenda pages 2 and 3 placeholder to mark an insertion point
+        begin with a disclaimer and then the two agenda pages.
+        """
 
         markdown = "There is no placeholder here in this place\n\n"
 
@@ -621,6 +642,4 @@ class TestAgendaPagesRemovalAndReplacement:
 
         for call in mock_convert_text.call_args_list:
             (text,), _kwargs = call
-            pattern = f"^{boilerplate}"
-            m = re.search(pattern, text)
-            assert m is not None
+            assert text == disclaimer + HR + boilerplate + HR + markdown
