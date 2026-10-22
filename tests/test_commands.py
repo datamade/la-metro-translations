@@ -13,6 +13,12 @@ from conftest import (
     ExtractionConfigFactory,
     TranslationConfigFactory,
 )
+
+from la_metro_translations.management.commands.text_utils import (
+    BOILERPLATE,
+    HR,
+    BoilerplateError,
+)
 from la_metro_translations.models import (
     DocumentContent,
     DocumentTranslation,
@@ -53,6 +59,50 @@ PATCH_START_BATCH_JOB = (
 PATCH_CHECK_BATCH_JOB = (
     "la_metro_translations.services.translation.BatchUtils.check_batch_job"
 )
+PATCH_PYPANDOC_CONVERT = (
+    "la_metro_translations.services.conversion.pypandoc.convert_text"
+)
+PATCH_WEASYPRINT_HTML = "la_metro_translations.services.conversion.HTML"
+
+
+@pytest.fixture(autouse=True)
+def no_reset_db_translate():
+    with patch(PATCH_TRANSLATE_RESET_DB):
+        yield
+
+
+@pytest.fixture(autouse=True)
+def mock_translate_service(document_content):
+    with patch(PATCH_TRANSLATE_SERVICE) as mock_service:
+        mock_service.return_value.metered_batch_translate.return_value = [
+            {
+                "document_id": str(document_content.document.document_id),
+                "markdown": "translated text",
+            }
+        ]
+        yield mock_service
+
+
+@pytest.fixture(autouse=True)
+def no_reset_db_convert():
+    with patch(PATCH_CONVERT_RESET_DB):
+        yield
+
+
+@pytest.fixture
+def doc_id_counter():
+    counter = itertools.count(1)
+    return lambda: next(counter)
+
+
+@pytest.fixture
+def make_translation(doc_id_counter):
+    def _make(language="spa"):
+        doc = DocumentFactory(document_id=doc_id_counter())
+        content = DocumentContentFactory(document=doc)
+        return DocumentTranslationFactory(document_content=content, language=language)
+
+    return _make
 
 
 @pytest.mark.django_db
@@ -62,22 +112,6 @@ class TestBatchTranslateCommand:
     --approval_status argument controls translation status and whether
     convert_docs is triggered.
     """
-
-    @pytest.fixture(autouse=True)
-    def no_reset_db(self):
-        with patch(PATCH_TRANSLATE_RESET_DB):
-            yield
-
-    @pytest.fixture(autouse=True)
-    def mock_translate_service(self, document_content):
-        with patch(PATCH_TRANSLATE_SERVICE) as mock_service:
-            mock_service.return_value.metered_batch_translate.return_value = [
-                {
-                    "document_id": str(document_content.document.document_id),
-                    "markdown": "translated text",
-                }
-            ]
-            yield mock_service
 
     @pytest.mark.parametrize("approval_status", ["waiting", "approved"])
     def test_creates_translations_with_correct_approval_status(
@@ -174,6 +208,7 @@ class TestBatchTranslateCommand:
         This case would only happen if a document produces more than 10 chunks.
         """
         document_content.markdown = make_document_pages(55)
+        document_content.processed = document_content.markdown
         document_content.save()
 
         doc = document_content.document
@@ -215,6 +250,7 @@ class TestBatchTranslateCommand:
         return all chunks from a single document, instead of creating an incomplete one.
         """
         document_content.markdown = make_document_pages(10)
+        document_content.processed = document_content.markdown
         document_content.save()
 
         doc = document_content.document
@@ -370,27 +406,6 @@ class TestConvertDocsCommand:
     and PDFs for all non-English DocumentTranslations with out-of-date PDFs.
     """
 
-    @pytest.fixture(autouse=True)
-    def no_reset_db(self):
-        with patch(PATCH_CONVERT_RESET_DB):
-            yield
-
-    @pytest.fixture
-    def doc_id_counter(self):
-        counter = itertools.count(1)
-        return lambda: next(counter)
-
-    @pytest.fixture
-    def make_translation(self, doc_id_counter):
-        def _make(language="spa"):
-            doc = DocumentFactory(document_id=doc_id_counter())
-            content = DocumentContentFactory(document=doc)
-            return DocumentTranslationFactory(
-                document_content=content, language=language
-            )
-
-        return _make
-
     def _set_updated_at(self, obj, dt):
         type(obj).objects.filter(pk=obj.pk).update(updated_at=dt)
         obj.refresh_from_db()
@@ -497,3 +512,134 @@ class TestConvertDocsCommand:
 
         mock_converter.convert_to_rtf.assert_called_once()
         mock_converter.convert_to_pdf.assert_called_once()
+
+
+@pytest.mark.django_db
+class TestAgendaPagesRemovalAndReplacement:
+
+    placeholder = BOILERPLATE["agenda_pages_2_and_3_text"]["placeholder"]
+
+    @pytest.fixture
+    def boilerplate(self, standard_translations):
+        return standard_translations.agenda_pages_2_and_3_text
+
+    @pytest.fixture
+    def agenda(self):
+        return DocumentFactory(entity_type="event", document_id="888")
+
+    @pytest.fixture
+    def disclaimer(self, standard_translations):
+        return standard_translations.disclaimer_text
+
+    @pytest.fixture
+    def mock_convert_text(self):
+        with patch(PATCH_PYPANDOC_CONVERT) as mock_convert:
+            mock_convert.return_value = "<html></html>"
+
+            yield mock_convert
+
+    @pytest.fixture
+    def mock_html(self):
+        with patch(PATCH_WEASYPRINT_HTML) as mock_html:
+            mock_html.return_value.write_pdf.return_value = b"pdf"
+            yield mock_html
+
+    @patch(PATCH_TRANSLATE_CALL_COMMAND)
+    def test_remove_boilerplace_selects_agenda_and_persists_in_db(
+        self, mock_call_command, translation_config, make_document_pages, agenda
+    ):
+
+        markdown = make_document_pages(5)
+
+        report = DocumentFactory(entity_type="bill", document_id="889")
+        agenda_content = DocumentContentFactory(document=agenda, markdown=markdown)
+        report_content = DocumentContentFactory(document=report, markdown=markdown)
+
+        run_command(
+            "batch_translate",
+            "Spanish",
+        )
+
+        agenda_content.refresh_from_db()
+        report_content.refresh_from_db()
+
+        # Agenda processed is modified
+        assert self.placeholder in agenda_content.processed
+        assert "End of Page 2" not in agenda_content.processed
+
+        # Agenda markdown remains untouched
+        assert self.placeholder not in agenda_content.markdown
+        assert "End of Page 2" in agenda_content.markdown
+
+        # Report markdown and processed are both untouched
+        assert "End of Page 2" in report_content.processed
+        assert "End of Page 2" in report_content.markdown
+        assert self.placeholder not in report_content.processed
+        assert self.placeholder not in report_content.markdown
+
+    def test_remove_boilerplate_errors_out_when_page_markers_not_found(
+        self, make_document_pages, agenda
+    ):
+        markdown = make_document_pages(1)
+        DocumentContentFactory(document=agenda, markdown=markdown)
+
+        with pytest.raises(BoilerplateError) as excinfo:
+            run_command("batch_translate", "Spanish")
+
+        assert "Expected exactly one instance" in str(excinfo.value.__cause__)
+        assert "0" in str(excinfo.value.__cause__)
+        assert "End of page markers not found" in str(excinfo.value)
+
+    def test_convert_doc_inserts_agenda_pages_2_and_3_boilerplate(
+        self,
+        mock_html,
+        mock_convert_text,
+        standard_translations,
+        agenda,
+        boilerplate,
+        disclaimer,
+    ):
+        """
+        Test that the placeholder is replaced by the boilerplate.
+        """
+
+        md1 = "This should come before the boilerplate\n\n"
+        md2 = f"{self.placeholder}\n\n"
+        md3 = "This should come after the boilerplate"
+
+        input = md1 + md2 + md3
+        expected = disclaimer + HR + md1 + HR + boilerplate + HR + md3
+
+        content = DocumentContentFactory(document=agenda)
+        DocumentTranslationFactory(document_content=content, markdown=input)
+
+        run_command("convert_docs")
+
+        for call in mock_convert_text.call_args_list:
+            (text,), _kwargs = call
+            assert text == expected
+
+    def test_convert_docs_prepends_boilerplate_when_no_placeholder_found(
+        self,
+        mock_convert_text,
+        mock_html,
+        agenda,
+        standard_translations,
+        boilerplate,
+        disclaimer,
+    ):
+        """
+        Test that files without an agenda pages 2 and 3 placeholder to mark an insertion point
+        begin with a disclaimer and then the two agenda pages.
+        """
+
+        markdown = "There is no placeholder here in this place\n\n"
+
+        content = DocumentContentFactory(document=agenda)
+        DocumentTranslationFactory(document_content=content, markdown=markdown)
+
+        run_command("convert_docs")
+
+        for call in mock_convert_text.call_args_list:
+            (text,), _kwargs = call
+            assert text == disclaimer + HR + boilerplate + HR + markdown

@@ -11,6 +11,11 @@ from la_metro_translations.models import (
 )
 from la_metro_translations.services import get_translation_service
 from la_metro_translations.management.commands.utils import ConnManagerMixin
+from la_metro_translations.management.commands.text_utils import (
+    BoilerplateError,
+    replace_inner_region_with_placeholder,
+    BOILERPLATE,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +60,31 @@ class Command(BaseCommand, ConnManagerMixin):
             ),
         )
 
+    def _remove_boilerplate(self, contents):
+        """
+        Remove boilerplate from documents so we don't keep re-translating it.
+
+        Pre-translated boilerplate will be re-inserted in the conversion step.
+        """
+
+        for content in contents:
+
+            md_text = content.markdown
+            content.processed = md_text
+            # Remove page 2 and 3 of event agendas
+            if content.document.get_entity_type_display() == "Event":
+                try:
+                    content.processed = replace_inner_region_with_placeholder(
+                        md_text, **BOILERPLATE["agenda_pages_2_and_3_text"]
+                    )
+                except BoilerplateError as err:
+                    raise BoilerplateError(
+                        "\n End of page markers not found for document %r"
+                        % content.document.document_id
+                    ) from err
+
+        DocumentContent.objects.bulk_update(contents, ["processed"])
+
     def handle(self, **options):
         approval_status = options["approval_status"]
 
@@ -85,6 +115,8 @@ class Command(BaseCommand, ConnManagerMixin):
                 id=document_content_id
             )
 
+            self._remove_boilerplate(contents)
+
             if not contents.exists():
                 raise ValueError(
                     f"Document content with the specified ID '{document_content_id}' "
@@ -108,6 +140,8 @@ class Command(BaseCommand, ConnManagerMixin):
                 .order_by(events_first)
                 .distinct()
             )
+
+            self._remove_boilerplate(contents)
 
         if len(contents) == 0:
             logger.info(f"All Documents have up to date {user_language} translations!")
