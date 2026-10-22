@@ -114,7 +114,7 @@ class DocumentTranslationConverter:
                 except BoilerplateError as err:
                     logger.warning(err)
                     logger.warning(
-                        "Could not find placeholder %r in document. Agenda pages 2 and 3"
+                        "Could not find placeholder %r in document. Agenda pages 2 and 3 "
                         "appended to beginning of the document instead.",
                         value["placeholder"],
                     )
