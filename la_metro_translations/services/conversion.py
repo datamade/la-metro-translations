@@ -46,12 +46,29 @@ class DocumentTranslationConverter:
         )
         self.standard_translations = standard_translations
 
-    def _prepend_disclaimer(self, language, text):
-        # All documents also get "translated" into English with no disclaimer
-        # Shortcircuit in that case
-        if language == "eng":
-            return text
+    def _prepare_translation(self, language, text):
+        """
+        Preparing document translations for conversion to PDF and RTF, including only
+        steps in common for both formats.
 
+        1. Replace boilerplate placeholders (non-English only)
+        2. Prepend machine translation disclaimed (non-English only)
+
+        Format-specific steps should be inlined in the relevant convert function.
+        """
+        if language == "eng":
+            pass
+        else:
+            text = self._replace_boilerplate(language, text)
+            text = self._prepend_disclaimer(language, text)
+
+        return text
+
+    def _prepend_disclaimer(self, language, text):
+        """
+        For use as part of self._prepare_translation.
+        Prepend disclaimer that translation is machine generated.
+        """
         pretranslated = self.standard_translations.get(language=language)
         if pretranslated is None:
             raise DocumentTranslationConverterError(
@@ -67,6 +84,11 @@ class DocumentTranslationConverter:
             return formatted_disclaimer + text
 
     def _replace_boilerplate(self, language, text):
+        """
+        For use as part of self._prepare_translation.
+        Find and replace placeholders inserted by the batch_translate
+        command's _remove_boilerplate step
+        """
 
         for key, value in BOILERPLATE.items():
 
@@ -107,8 +129,7 @@ class DocumentTranslationConverter:
         md_text = re.sub(r"!\[[^]]+\]", "![]", md_text)
 
         language = self.doc_translation.language
-        md_text = self._replace_boilerplate(language, md_text)
-        md_text = self._prepend_disclaimer(language, md_text)
+        md_text = self._prepare_translation(language, md_text)
 
         try:
             # Pypandoc requires PDFs to be written to the filesystem so
@@ -143,6 +164,9 @@ class DocumentTranslationConverter:
         )
 
     def insert_image_placeholder_text(self, text):
+        """
+        For use in RTF conversion only, because RTFs do not reliably display images.
+        """
 
         IMAGE_REMOVED_MAP = {
             "eng": "Image removed",
@@ -195,8 +219,7 @@ class DocumentTranslationConverter:
         md_text = self.insert_image_placeholder_text(md_text)
 
         language = self.doc_translation.language
-        md_text = self._replace_boilerplate(language, md_text)
-        md_text = self._prepend_disclaimer(language, md_text)
+        md_text = self._prepare_translation(language, md_text)
 
         try:
             output = pypandoc.convert_text(
