@@ -8,7 +8,7 @@ FROM python:3.14 AS app
 LABEL maintainer "DataMade <info@datamade.us>"
 
 RUN apt-get update && \
-	apt-get install -y --no-install-recommends --purge postgresql-client gdal-bin pandoc fonts-noto-cjk && \
+	apt-get install -y --no-install-recommends --purge postgresql-client gdal-bin pandoc fonts-noto-cjk ca-certificates && \
 	apt-get autoclean && \
 	rm -rf /var/lib/apt/lists/* && \
 	rm -rf /tmp/*
@@ -17,7 +17,8 @@ RUN mkdir /app
 WORKDIR /app
 
 COPY ./requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip setuptools certifi>=2026.10.19 && \
+	pip install --no-cache-dir -r requirements.txt
 
 # Get NodeJS & npm
 COPY --from=node /usr/local/bin /usr/local/bin
