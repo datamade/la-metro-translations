@@ -1,8 +1,17 @@
 FROM ghcr.io/datamade/la-metro-translations:main
 
+RUN apt-get update && \
+	apt-get install -y --no-install-recommends ca-certificates && \
+	rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /etc/ssl/empty-capath
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
+	SSL_CERT_DIR=/etc/ssl/empty-capath
+
 # Install any requirements not in the base image
 COPY ./requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip setuptools certifi>=2026.10.19 && \
+	pip install --no-cache-dir -r requirements.txt
 
 COPY ./package.json /app/package.json
 RUN npm install
