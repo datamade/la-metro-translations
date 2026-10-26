@@ -541,8 +541,8 @@ class ExtractionConfig(BaseGenericSetting, ClusterableModel):
             "language_configs",
             heading="Language Translation Settings",
             help_text=(
-                "Configure auto-approval for each supported translation language. "
-                "Add one row per language."
+                "Configure auto-approval and translation model settings for each "
+                "supported translation language. Add one row per language."
             ),
         ),
     ]
@@ -605,6 +605,10 @@ class TranslationConfig(Orderable):
     NON_ENGLISH_LANGUAGE_CHOICES = [
         choice for choice in DocumentTranslation.LANGUAGE_CHOICES if choice[0] != "eng"
     ]
+    TARGET_TRANSLATOR_CHOICES = [
+        ("mistral-small-latest", "Mistral Small"),
+        ("mistral-large-latest", "Mistral Large"),
+    ]
 
     config = ParentalKey(
         ExtractionConfig,
@@ -618,6 +622,11 @@ class TranslationConfig(Orderable):
             "Automatically approve machine translations in this language. "
             "Translations marked as Needs Revision will not be auto-approved."
         ),
+    )
+    target_translator = models.CharField(
+        choices=TARGET_TRANSLATOR_CHOICES,
+        default="mistral-small-latest",
+        help_text="The model used to create translations in this language.",
     )
 
     class Meta(Orderable.Meta):
@@ -657,27 +666,30 @@ class TranslationConfig(Orderable):
             super().save(*args, **kwargs)
 
 
-class Disclaimer(models.Model):
-    language = models.CharField(choices=DocumentTranslation.LANGUAGE_CHOICES)
-    disclaimer_text = models.TextField()
+class StandardTranslations(models.Model):
+    """
+    This model is for pre-translated bits of text and boilerplate that do not
+    need to be translated each time. Metro manages these in Wagtail.
 
-    def __str__(self):
-        return f"{self.get_language_display()} [{self.language}] Disclaimer"
+    The text in DocumentTranslations is the result of removing boilerplate, LLM
+    translation of the remaining text, and then inserting pre-translated
+    boilerplate from here into the LLM translation before document conversion.
 
-    class Meta:
-        ordering = ["language"]
+    Some frontend snippets also live here, e.g. download link text.
 
+    """
 
-class LinkText(models.Model):
     language = models.CharField(
         choices=DocumentTranslation.LANGUAGE_CHOICES, unique=True
     )
     agenda_download_text = models.TextField()
     board_report_download_text = models.TextField()
+    disclaimer_text = models.TextField()
 
     def __str__(self):
-        return f"{self.get_language_display()} [{self.language}] Link Text"
+        return f"{self.get_language_display()} [{self.language}] Standard Translations"
 
     class Meta:
         ordering = ["language"]
-        verbose_name_plural = "Download Link Translations"
+        verbose_name = "Standard Translations"
+        verbose_name_plural = "Standard Translations"

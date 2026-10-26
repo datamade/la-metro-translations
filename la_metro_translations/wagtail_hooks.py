@@ -19,8 +19,7 @@ from .models import (
     DocumentContent,
     DocumentTranslation,
     ExtractionConfig,
-    Disclaimer,
-    LinkText,
+    StandardTranslations,
 )
 from .panels import PropertyPanel, RelatedObjectsPanel
 
@@ -408,31 +407,19 @@ class DocumentTranslationViewSet(ModelViewSet):
     ]
 
 
-class DisclaimerViewSet(SnippetViewSet):
+class StandardTranslationsViewSet(SnippetViewSet):
 
-    model = Disclaimer
-
-    panels = [
-        FieldPanel("language"),
-        FieldPanel("disclaimer_text"),
-    ]
-
-
-register_snippet(DisclaimerViewSet)
-
-
-class LinkTextViewSet(SnippetViewSet):
-
-    model = LinkText
+    model = StandardTranslations
 
     panels = [
         FieldPanel("language"),
         FieldPanel("agenda_download_text"),
         FieldPanel("board_report_download_text"),
+        FieldPanel("disclaimer_text"),
     ]
 
 
-register_snippet(LinkTextViewSet)
+register_snippet(StandardTranslationsViewSet)
 
 
 @hooks.register("register_admin_viewset")
@@ -467,22 +454,12 @@ def register_prompt_menu_item():
 
 
 @hooks.register("register_settings_menu_item")
-def register_disclaimer_menu_item():
+def register_standard_translations_menu_item():
     return MenuItem(
-        "Disclaimers",
-        reverse("wagtailsnippets_la_metro_translations_disclaimer:list"),
-        icon_name="info-circle",
+        "Standard Translations",
+        reverse("wagtailsnippets_la_metro_translations_standardtranslations:list"),
+        icon_name="edit",
         order=52,
-    )
-
-
-@hooks.register("register_settings_menu_item")
-def register_link_text_menu_item():
-    return MenuItem(
-        "Download Link Text",
-        reverse("wagtailsnippets_la_metro_translations_linktext:list"),
-        icon_name="info-circle",
-        order=53,
     )
 
 
