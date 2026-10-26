@@ -1,4 +1,4 @@
-FROM node:24-slim AS node
+FROM node:26-slim AS node
 
 COPY ./package.json package.json
 RUN npm install
