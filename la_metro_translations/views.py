@@ -7,7 +7,7 @@ from django.http import JsonResponse
 
 from wagtail.admin.auth import require_admin_access
 
-from la_metro_translations.celery import debug_task
+from la_metro_translations.tasks import debug_task
 
 
 class PromptView(TemplateView):
