@@ -8,13 +8,16 @@ from django.db.models import F, Case, When
 from la_metro_translations.models import (
     DocumentContent,
     DocumentTranslation,
+    StandardTranslations,
 )
 from la_metro_translations.services import get_translation_service
 from la_metro_translations.management.commands.utils import ConnManagerMixin
 from la_metro_translations.management.commands.text_utils import (
     BoilerplateError,
     replace_inner_region_with_placeholder,
+    replace_placeholder_with_pretranslated_text,
     BOILERPLATE,
+    HR,
 )
 
 logger = logging.getLogger(__name__)
@@ -32,6 +35,8 @@ class Command(BaseCommand, ConnManagerMixin):
         "have been updated more recently than their DocumentTranslation for "
         "that language, then upsert its DocumentTranslation."
     )
+
+    standard_translations = StandardTranslations.objects.all()
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -84,6 +89,44 @@ class Command(BaseCommand, ConnManagerMixin):
                     ) from err
 
         DocumentContent.objects.bulk_update(contents, ["processed"])
+
+    def _replace_boilerplate(self, language, text, document_type):
+        """
+        After translation is returned from LLM, find and replace placeholders inserted
+        by the _remove_boilerplate step.
+        """
+
+        for key, value in BOILERPLATE.items():
+
+            pretranslated = self.standard_translations.get(language=language)
+            if pretranslated is None:
+                raise BoilerplateError(
+                    f"No standard translations exist for target language: {language}"
+                )
+
+            boilerplate = getattr(pretranslated, key)
+            if boilerplate == "":  # fields default to ""
+                raise BoilerplateError(
+                    f"No replacement boilerplate found for {language} {key}"
+                )
+
+            if "agenda_pages_2_and_3" in key and document_type == "event_document":
+                try:
+                    text = replace_placeholder_with_pretranslated_text(
+                        text,
+                        boilerplate=boilerplate,
+                        placeholder=value["placeholder"],
+                    )
+                except BoilerplateError as err:
+                    logger.warning(err)
+                    logger.warning(
+                        "Could not find placeholder %r in document. Agenda pages 2 and 3 "
+                        "appended to beginning of the document instead.",
+                        value["placeholder"],
+                    )
+                    text = boilerplate + HR + text
+
+        return text
 
     def handle(self, **options):
         approval_status = options["approval_status"]
@@ -153,11 +196,20 @@ class Command(BaseCommand, ConnManagerMixin):
             )
 
         translated_contents = {
-            t["document_id"]: t["markdown"]
+            t["document_id"]: {
+                "document_type": t["document_type"],
+                "raw_output": t["markdown"],
+            }
             for t in get_translation_service().metered_batch_translate(
                 contents, user_language
             )
         }
+
+        # put boilerplate back in before creating DB objects
+        for _, t in translated_contents:
+            t["processed_output"] = self._replace_boilerplate(
+                user_language_value, t["markdown"], t["document_type"]
+            )
 
         self.reset_db_connections()
 
@@ -180,7 +232,8 @@ class Command(BaseCommand, ConnManagerMixin):
                 DocumentTranslation(
                     document_content=content,
                     language=user_language_value,
-                    markdown=matched_translation,
+                    raw_output=matched_translation["raw_output"],
+                    markdown=matched_translation["processed_output"],
                     approval_status=approval_status,
                     updated_at=now,
                 )

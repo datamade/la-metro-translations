@@ -346,6 +346,12 @@ class DocumentTranslation(AdminDisplayMixin, models.Model):
     ]
 
     markdown = MarkdownField()
+    raw_output = MarkdownField(
+        default="",
+        help_text="This is the raw output from the LLM before any post-processing, "
+        "such as replacing placeholder text with standard translations/"
+        "boilerplate.",
+    )
     language = models.CharField(choices=LANGUAGE_CHOICES)
     approval_status = models.CharField(
         choices=APPROVAL_STATUS_CHOICES, default="waiting"
