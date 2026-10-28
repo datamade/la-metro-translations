@@ -15,3 +15,7 @@ run:
     command:
       - celery -A la_metro_translations worker --loglevel=info --concurrency=2
     image: web
+  beat:
+    command:
+      - celery -A la_metro_translations beat --loglevel=info
+    image: web
