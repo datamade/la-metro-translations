@@ -206,9 +206,9 @@ class Command(BaseCommand, ConnManagerMixin):
         }
 
         # put boilerplate back in before creating DB objects
-        for _, t in translated_contents:
+        for _, t in translated_contents.items():
             t["processed_output"] = self._replace_boilerplate(
-                user_language_value, t["markdown"], t["document_type"]
+                user_language_value, t["raw_output"], t["document_type"]
             )
 
         self.reset_db_connections()
