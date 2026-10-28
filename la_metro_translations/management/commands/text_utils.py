@@ -75,10 +75,8 @@ def replace_placeholder_with_pretranslated_text(
     text: str, *, boilerplate: str, placeholder: str
 ) -> str:
     """
-    Find placeholder and replace it with pretranslated text.
-
-    If the placeholder is not found in the original text, error from unique_index()
-    propagates to caller for handling.
+    Find placeholder and replace it with pretranslated text, i.e., boilerplate that
+    has already been translated.
     """
 
     pattern = placeholder + r"[\r\n]*"
