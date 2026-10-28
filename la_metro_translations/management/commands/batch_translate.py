@@ -89,9 +89,9 @@ class Command(BaseCommand, ConnManagerMixin):
         approval_status = options["approval_status"]
 
         supported_languages = [
-            choice
-            for choice in DocumentTranslation.LANGUAGE_CHOICES
-            if choice[0] != "eng"
+            (value, display)
+            for value, display in DocumentTranslation.LANGUAGE_CHOICES
+            if value != "eng"
         ]
 
         user_language = options["language"].title()
@@ -103,8 +103,9 @@ class Command(BaseCommand, ConnManagerMixin):
             ),
             None,
         )
+
         if not user_language_value:
-            display_choices = [choice[1] for choice in supported_languages]
+            display_choices = [display for _, display in supported_languages]
             raise ValueError(
                 f"This suite does not support translations to {user_language}. "
                 f"Currently supported languages are: {', '.join(display_choices)}"
