@@ -9,12 +9,8 @@ from weasyprint import HTML
 
 from django.core.files.uploadedfile import InMemoryUploadedFile
 
-from la_metro_translations.management.commands.text_utils import (
-    BOILERPLATE,
-    BoilerplateError,
-    replace_placeholder_with_pretranslated_text,
-    HR,
-)
+from la_metro_translations.management.commands.text_utils import HR
+
 from la_metro_translations.models import (
     TranslationFile,
     DocumentTranslation,
@@ -46,29 +42,14 @@ class DocumentTranslationConverter:
         )
         self.standard_translations = standard_translations
 
-    def _prepare_translation(self, language, text):
-        """
-        Preparing document translations for conversion to PDF and RTF, including only
-        steps in common for both formats.
-
-        1. Replace boilerplate placeholders (non-English only)
-        2. Prepend machine translation disclaimed (non-English only)
-
-        Format-specific steps should be inlined in the relevant convert function.
-        """
-        if language == "eng":
-            pass
-        else:
-            text = self._replace_boilerplate(language, text)
-            text = self._prepend_disclaimer(language, text)
-
-        return text
-
     def _prepend_disclaimer(self, language, text):
         """
         For use as part of self._prepare_translation.
         Prepend disclaimer that translation is machine generated.
         """
+        if language == "eng":
+            pass
+
         pretranslated = self.standard_translations.get(language=language)
         if pretranslated is None:
             raise DocumentTranslationConverterError(
@@ -83,45 +64,6 @@ class DocumentTranslationConverter:
             formatted_disclaimer = f"{disclaimer}{HR}"
             return formatted_disclaimer + text
 
-    def _replace_boilerplate(self, language, text):
-        """
-        For use as part of self._prepare_translation.
-        Find and replace placeholders inserted by the batch_translate
-        command's _remove_boilerplate step
-        """
-
-        for key, value in BOILERPLATE.items():
-
-            pretranslated = self.standard_translations.get(language=language)
-            if pretranslated is None:
-                raise DocumentTranslationConverterError(
-                    f"No standard translations exist for target language: {language}"
-                )
-
-            boilerplate = getattr(pretranslated, key)
-            if boilerplate == "":  # fields default to ""
-                raise DocumentTranslationConverterError(
-                    f"No replacement boilerplate found for {language} {key}"
-                )
-
-            if "agenda_pages_2_and_3" in key and self.is_agenda:
-                try:
-                    text = replace_placeholder_with_pretranslated_text(
-                        text,
-                        boilerplate=boilerplate,
-                        placeholder=value["placeholder"],
-                    )
-                except BoilerplateError as err:
-                    logger.warning(err)
-                    logger.warning(
-                        "Could not find placeholder %r in document. Agenda pages 2 and 3 "
-                        "appended to beginning of the document instead.",
-                        value["placeholder"],
-                    )
-                    text = boilerplate + HR + text
-
-        return text
-
     def convert_to_pdf(self) -> TranslationFile:
         md_text = self.doc_translation.markdown or ""
 
@@ -129,7 +71,7 @@ class DocumentTranslationConverter:
         md_text = re.sub(r"!\[[^]]+\]", "![]", md_text)
 
         language = self.doc_translation.language
-        md_text = self._prepare_translation(language, md_text)
+        md_text = self._prepend_disclaimer(language, md_text)
 
         try:
             # Pypandoc requires PDFs to be written to the filesystem so
@@ -219,7 +161,7 @@ class DocumentTranslationConverter:
         md_text = self.insert_image_placeholder_text(md_text)
 
         language = self.doc_translation.language
-        md_text = self._prepare_translation(language, md_text)
+        md_text = self._prepend_disclaimer(language, md_text)
 
         try:
             output = pypandoc.convert_text(
