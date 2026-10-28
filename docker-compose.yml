@@ -27,6 +27,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+      celery_worker:
+        condition: service_started
+      celery_beat:
+        condition: service_started
     volumes:
       - .:/app
       - la_metro_translations-node-modules:/app/node_modules
@@ -39,6 +45,15 @@ services:
       - .env
     entrypoint: /app/docker-entrypoint.sh
     command: python manage.py runserver 0.0.0.0:8000
+
+  redis:
+    container_name: la_metro_translations-redis
+    image: redis:8
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   postgres:
     container_name: la_metro_translations-postgres
@@ -56,6 +71,50 @@ services:
       - la_metro_translations-db-data:/var/lib/postgresql
     ports:
       - 32001:5432
+
+  celery_worker:
+    image: la_metro_translations
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: app
+    depends_on:
+      - redis
+      - postgres
+    volumes:
+      - .:/app
+      - la_metro_translations-node-modules:/app/node_modules
+    environment:
+      DJANGO_SECRET_KEY: reallysupersecret
+      DJANGO_MANAGEPY_MIGRATE: "on"
+      DJANGO_DEBUG: "True"
+      PGPASSWORD: postgres
+    env_file:
+      - .env
+    entrypoint: /app/docker-entrypoint.sh
+    command: celery -A la_metro_translations worker --loglevel=info
+
+  celery_beat:
+    image: la_metro_translations
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: app
+    depends_on:
+      - redis
+      - postgres
+    volumes:
+      - .:/app
+      - la_metro_translations-node-modules:/app/node_modules
+    environment:
+      DJANGO_SECRET_KEY: reallysupersecret
+      DJANGO_MANAGEPY_MIGRATE: "on"
+      DJANGO_DEBUG: "True"
+      PGPASSWORD: postgres
+    env_file:
+      - .env
+    entrypoint: /app/docker-entrypoint.sh
+    command: celery -A la_metro_translations beat --loglevel=info
 
 volumes:
   la_metro_translations-db-data:
