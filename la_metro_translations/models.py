@@ -4,7 +4,7 @@ from django.conf import settings
 from la_metro_translations.backends import get_backend
 from django.db import models
 from django.urls import reverse
-from django.utils.html import format_html, format_html_join
+from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.utils.formats import date_format
 
@@ -278,32 +278,18 @@ class DocumentContent(AdminDisplayMixin, models.Model):
 
     file_formats_display.short_description = "File Formats"
 
-    @classmethod
-    def _format_missing_list(cls, list):
-        return format_html(
-            "<ul class='missing-list'>{}</ul>",
-            format_html_join(
-                "\n",
-                "<li><p>{}</p><button class='button'>Translate</button></li>",
-                ((item,) for item in list),
-            ),
-        )
-
     def missing_translations(self):
 
         existing_translations = list(
             self.translations.values_list("language", flat=True)
         )
         missing = [
-            display
+            (code, display)
             for (code, display) in DocumentTranslation.LANGUAGE_CHOICES
             if code not in existing_translations
         ]
 
-        if not missing:
-            return "This document has translations in all supported languages."
-
-        return self._format_missing_list(missing)
+        return missing
 
 
 class DocumentTranslation(AdminDisplayMixin, models.Model):

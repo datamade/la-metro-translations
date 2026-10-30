@@ -1,0 +1,19 @@
+<div class="w-field__wrapper">
+{% if missing %}
+   <ul class='missing-list'>
+{% for code, display in missing %}
+   <li>
+     <p>{{display}}</p>
+     <button
+       class='button button-small'
+       type='button'
+     >
+       Translate
+     </button>
+   </li>
+     {% endfor %}
+   </ul>
+{% else %}
+<p> This document has translations in all supported languages. </p>
+{% endif %}
+</div>

@@ -67,3 +67,16 @@ class RelatedObjectsPanel(Panel):
                 rows.append(mark_safe("".join(fields)))
 
             return mark_safe("".join(rows))
+
+
+class MissingTranslationsPanel(Panel):
+    class BoundPanel(Panel.BoundPanel):
+        template_name = "panels/missing_translations.html"
+
+        def get_context_data(self, parent_context=None):
+            context = super().get_context_data(parent_context)
+            context["missing"] = self.instance.missing_translations()
+            return context
+
+        class Media:
+            js = "missing_translations.js"

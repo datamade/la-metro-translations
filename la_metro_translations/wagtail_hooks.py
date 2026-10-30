@@ -21,7 +21,7 @@ from .models import (
     ExtractionConfig,
     StandardTranslations,
 )
-from .panels import PropertyPanel, RelatedObjectsPanel
+from .panels import MissingTranslationsPanel, PropertyPanel, RelatedObjectsPanel
 
 
 @hooks.register("insert_global_admin_css")
@@ -269,7 +269,7 @@ class DocumentContentViewSet(ModelViewSet):
             ],
             heading="Document Translations",
         ),
-        PropertyPanel("missing_translations", heading="Missing translations"),
+        MissingTranslationsPanel(heading="Missing translations"),
     ]
 
 
