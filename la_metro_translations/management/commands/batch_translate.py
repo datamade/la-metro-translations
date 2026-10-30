@@ -12,7 +12,7 @@ from la_metro_translations.models import (
 )
 from la_metro_translations.services import get_translation_service
 from la_metro_translations.management.commands.utils import ConnManagerMixin
-from la_metro_translations.management.commands.text_utils import (
+from la_metro_translations.utils import (
     BoilerplateError,
     replace_inner_region_with_placeholder,
     replace_placeholder_with_pretranslated_text,

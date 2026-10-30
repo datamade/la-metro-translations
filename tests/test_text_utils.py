@@ -1,5 +1,5 @@
 import pytest
-from la_metro_translations.management.commands.text_utils import (
+from la_metro_translations.utils import (
     BoilerplateError,
     replace_inner_region_with_placeholder,
     replace_placeholder_with_pretranslated_text,

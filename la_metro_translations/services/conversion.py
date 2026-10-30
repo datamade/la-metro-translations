@@ -9,7 +9,7 @@ from weasyprint import HTML
 
 from django.core.files.uploadedfile import InMemoryUploadedFile
 
-from la_metro_translations.management.commands.text_utils import HR
+from la_metro_translations.utils import HR
 
 from la_metro_translations.models import (
     TranslationFile,

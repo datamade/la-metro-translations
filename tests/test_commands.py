@@ -14,7 +14,7 @@ from conftest import (
     TranslationConfigFactory,
 )
 
-from la_metro_translations.management.commands.text_utils import (
+from la_metro_translations.utils import (
     BOILERPLATE,
     HR,
     BoilerplateError,
