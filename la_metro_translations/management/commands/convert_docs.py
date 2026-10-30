@@ -4,7 +4,11 @@ from django.core.management.base import BaseCommand
 from django.db.models import OuterRef, Subquery
 from tqdm import tqdm
 
-from la_metro_translations.models import DocumentTranslation, TranslationFile
+from la_metro_translations.models import (
+    DocumentTranslation,
+    StandardTranslations,
+    TranslationFile,
+)
 from la_metro_translations.services import (
     DocumentTranslationConverter,
     DocumentTranslationConverterError,
@@ -16,6 +20,8 @@ logger = logging.getLogger(__name__)
 
 class Command(BaseCommand, ConnManagerMixin):
     help = "Creates RTF and PDF translation files"
+
+    standard_translations = StandardTranslations.objects.all()
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -39,7 +45,7 @@ class Command(BaseCommand, ConnManagerMixin):
 
     def convert_doc(self, document_translation_id):
         doc = DocumentTranslation.objects.get(id=document_translation_id)
-        converter = DocumentTranslationConverter(doc)
+        converter = DocumentTranslationConverter(doc, self.standard_translations)
         files_to_create = [converter.convert_to_rtf()]
         if doc.language != "eng":
             files_to_create.append(converter.convert_to_pdf())
@@ -106,11 +112,11 @@ class Command(BaseCommand, ConnManagerMixin):
                     try:
                         if file_format == "rtf":
                             converted_file = DocumentTranslationConverter(
-                                doc
+                                doc, self.standard_translations
                             ).convert_to_rtf()
                         else:
                             converted_file = DocumentTranslationConverter(
-                                doc
+                                doc, self.standard_translations
                             ).convert_to_pdf()
                     except DocumentTranslationConverterError as e:
                         logger.error(f"Error converting {doc} to {file_format}: {e}")

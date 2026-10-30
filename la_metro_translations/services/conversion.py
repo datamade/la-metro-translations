@@ -1,17 +1,22 @@
 import io
 import os
 import re
+import logging
+from django.db.models import QuerySet
 import pypandoc
 
 from weasyprint import HTML
 
 from django.core.files.uploadedfile import InMemoryUploadedFile
 
+from la_metro_translations.utils import HR
+
 from la_metro_translations.models import (
-    StandardTranslations,
     TranslationFile,
     DocumentTranslation,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class DocumentTranslationConverterError(Exception):
@@ -19,7 +24,9 @@ class DocumentTranslationConverterError(Exception):
 
 
 class DocumentTranslationConverter:
-    def __init__(self, doc_translation: DocumentTranslation):
+    def __init__(
+        self, doc_translation: DocumentTranslation, standard_translations: QuerySet
+    ):
         if not isinstance(doc_translation, DocumentTranslation):
             raise DocumentTranslationConverterError(
                 "Must pass a DocumentTranslation instance."
@@ -30,21 +37,32 @@ class DocumentTranslationConverter:
             os.path.dirname(os.path.abspath(__file__))
             + "/../static/css/converted_docs.css"
         )
+        self.is_agenda = (
+            doc_translation.document_content.document.entity_type == "event"
+        )
+        self.standard_translations = standard_translations
 
     def _prepend_disclaimer(self, language, text):
-        # All documents also get "translated" into English with no disclaimer
-        # Shortcircuit in that case
+        """
+        For use as part of self._prepare_translation.
+        Prepend disclaimer that translation is machine generated.
+        """
         if language == "eng":
-            return text
+            pass
 
-        try:
-            pretranslated = StandardTranslations.objects.get(language=language)
-        except StandardTranslations.DoesNotExist:
+        pretranslated = self.standard_translations.get(language=language)
+        if pretranslated is None:
             raise DocumentTranslationConverterError(
-                f"No disclaimer found for target language: {language}"
+                f"No standard translations exist for target language: {language}"
             )
-        formatted_disclaimer = f"{pretranslated.disclaimer_text}\n\n---\n\n"
-        return formatted_disclaimer + text
+
+        disclaimer = pretranslated.disclaimer_text
+        if disclaimer == "":
+            logger.info(f"No disclaimer found for {language}")
+            return text
+        else:
+            formatted_disclaimer = f"{disclaimer}{HR}"
+            return formatted_disclaimer + text
 
     def convert_to_pdf(self) -> TranslationFile:
         md_text = self.doc_translation.markdown or ""
@@ -88,6 +106,9 @@ class DocumentTranslationConverter:
         )
 
     def insert_image_placeholder_text(self, text):
+        """
+        For use in RTF conversion only, because RTFs do not reliably display images.
+        """
 
         IMAGE_REMOVED_MAP = {
             "eng": "Image removed",
@@ -119,8 +140,7 @@ class DocumentTranslationConverter:
         language = str(self.doc_translation.language)
         image_removed_text = IMAGE_REMOVED_MAP[language]
         metro_logo_text = METRO_LOGO_MAP[language]
-        entity_type = self.doc_translation.document_content.document.entity_type
-        if entity_type == "event":
+        if self.is_agenda:
             return re.sub(
                 r"!\[(.*?)\]\(data:image/[^)]+\)",
                 lambda m: (

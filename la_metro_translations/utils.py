@@ -1,0 +1,89 @@
+# Utility functions for removing and inserting boilerplate text before and after translation.
+import re
+
+
+class BoilerplateError(ValueError):
+    """
+    Error class for identifying issues detecting unique markers in the text,
+    including boundary markers for boilerplate text to be removed, and placeholder text to
+    be replaced.
+    """
+
+
+BOILERPLATE: dict[str, dict[str, str]] = {
+    "agenda_pages_2_and_3_text": {
+        "placeholder": "<AGENDA_PAGE_2_3_PLACEHOLDER>",
+        "start": "End of Page 1\n\n",
+        "end": "End of Page 3\n\n",
+    }
+}
+
+HR = "\n\n---\n\n"
+
+
+def unique_index(text: str, token: str) -> int:
+    """
+    Find the starting index of a given token with a stretch of text.
+    Raise an error if the token is not unique.
+    """
+    count = text.count(token)
+    if count != 1:
+        raise BoilerplateError(
+            f"Expected exactly one instance of {token!r}, found {count}"
+        )
+    return text.index(token)
+
+
+def get_marker_indexes(text: str, start: str, end: str) -> tuple[int, int]:
+    """
+    Helper function for removing boilerplate.
+
+    Returns the positions of start and end markers, assuming they are unique
+    strings within the given text, and that start comes before end. Complains if
+    either of these assumptions don't hold.
+    """
+
+    start_index = unique_index(text, start)
+    end_index = unique_index(text, end)
+
+    if end_index < start_index:
+        raise BoilerplateError(f"{end!r} appears before {start!r}")
+
+    return start_index, end_index
+
+
+def replace_inner_region_with_placeholder(
+    text: str, *, start: str, end: str, placeholder: str
+) -> str:
+    """
+    Use to strip out boilerplate before translation and mark for replacement before
+    conversion (convert_docs).
+
+    Deleted inner region excludes start string and includes end string.
+
+    If get_marker_indexes returns an error, propagate to caller to handle.
+    Insert placeholder only if no error.
+    """
+
+    start_index, end_index = get_marker_indexes(text, start, end)
+    before = text[: start_index + len(start)]  # don't cut out start string
+    after = text[end_index + len(end) :]  # do cut out end string
+    return before + placeholder + "\n\n" + after
+
+
+def replace_placeholder_with_pretranslated_text(
+    text: str, *, boilerplate: str, placeholder: str
+) -> str:
+    """
+    Find placeholder and replace it with pretranslated text, i.e., boilerplate that
+    has already been translated.
+    """
+
+    pattern = placeholder + r"[\r\n]*"
+    match = re.search(pattern, text)
+    if match is None:
+        raise BoilerplateError()
+    before = text[: match.start()]
+    after = text[match.end() :]
+
+    return before + HR + boilerplate + HR + after
