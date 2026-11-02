@@ -15,7 +15,7 @@ from conftest import (
 )
 
 from la_metro_translations.utils import (
-    BOILERPLATE,
+    BOILERPLATE_INFO,
     HR,
     BoilerplateError,
 )
@@ -520,7 +520,7 @@ class TestConvertDocsCommand:
 @pytest.mark.django_db
 class TestAgendaPagesRemovalAndReplacement:
 
-    placeholder = BOILERPLATE["agenda_pages_2_and_3_text"]["placeholder"]
+    placeholder = BOILERPLATE_INFO["agenda_pages_2_and_3_text"]["placeholder"]
 
     @pytest.fixture
     def boilerplate(self, standard_translations):
@@ -623,7 +623,7 @@ class TestAgendaPagesRemovalAndReplacement:
             assert translation.markdown == no_placeholder
 
     def test_batch_translate_errors_out_when_page_markers_not_found(
-        self, make_document_pages
+        self, make_document_pages, standard_translations
     ):
         markdown = make_document_pages(1)
         agenda = DocumentFactory(

@@ -16,7 +16,7 @@ from la_metro_translations.utils import (
     BoilerplateError,
     replace_inner_region_with_placeholder,
     replace_placeholder_with_pretranslated_text,
-    BOILERPLATE,
+    BOILERPLATE_INFO,
     HR,
 )
 
@@ -65,66 +65,79 @@ class Command(BaseCommand, ConnManagerMixin):
             ),
         )
 
-    def _remove_boilerplate(self, contents):
+    # Check if boilerplate exists and inform user
+    def _get_boilerplate(self, pretranslated) -> dict[str, str]:
+        existing = {}
+        for key in BOILERPLATE_INFO.keys():
+            boilerplate = getattr(pretranslated, key)
+            if boilerplate != "":
+                existing[key] = boilerplate
+        if existing:
+            logger.info(
+                f"Found replacement boilerplate translations for {', '.join(existing.keys())}"
+            )
+        else:
+            logger.info(
+                "No replacement boilerplate translations found for above "
+                "language. Continuing to translation without any pre- or "
+                "post-processing of document content."
+            )
+        return existing
+
+    def _remove_boilerplate(self, boilerplate, contents):
         """
         Remove boilerplate from documents so we don't keep re-translating it.
 
         Pre-translated boilerplate will be re-inserted in the conversion step.
         """
 
+        # If standard translations for language are not set up at all, do not continue.
+
         for content in contents:
 
             md_text = content.markdown
             content.processed = md_text
-            # Remove page 2 and 3 of event agendas
-            if content.document.get_entity_type_display() == "Event":
-                try:
-                    content.processed = replace_inner_region_with_placeholder(
-                        md_text, **BOILERPLATE["agenda_pages_2_and_3_text"]
-                    )
-                except BoilerplateError as err:
-                    raise BoilerplateError(
-                        "\n End of page markers not found for document %r"
-                        % content.document.document_id
-                    ) from err
+
+            for key in boilerplate.keys():
+
+                # Remove page 2 and 3 of event agendas
+                if (
+                    key == "agenda_pages_2_and_3_text"
+                    and content.document.get_entity_type_display() == "Event"
+                ):
+                    try:
+                        content.processed = replace_inner_region_with_placeholder(
+                            md_text, **BOILERPLATE_INFO[key]
+                        )
+                    except BoilerplateError as err:
+                        raise BoilerplateError(
+                            "\n End of page markers not found for document %r"
+                            % content.document.document_id
+                        ) from err
 
         DocumentContent.objects.bulk_update(contents, ["processed"])
 
-    def _replace_boilerplate(self, language, text, document_type):
+    def _replace_boilerplate(self, boilerplate, text, document_type):
         """
         After translation is returned from LLM, find and replace placeholders inserted
         by the _remove_boilerplate step.
         """
 
-        for key, value in BOILERPLATE.items():
-
-            pretranslated = self.standard_translations.get(language=language)
-            if pretranslated is None:
-                raise BoilerplateError(
-                    f"No standard translations exist for target language: {language}"
-                )
-
-            boilerplate = getattr(pretranslated, key)
-            if boilerplate == "":  # fields default to ""
-                raise BoilerplateError(
-                    f"No replacement boilerplate found for {language} {key}"
-                )
-
+        for key, value in boilerplate.items():
+            placeholder = BOILERPLATE_INFO[key]["placeholder"]
             if "agenda_pages_2_and_3" in key and document_type == "event_document":
                 try:
                     text = replace_placeholder_with_pretranslated_text(
-                        text,
-                        boilerplate=boilerplate,
-                        placeholder=value["placeholder"],
+                        text, boilerplate=value, placeholder=placeholder
                     )
                 except BoilerplateError as err:
                     logger.warning(err)
                     logger.warning(
                         "Could not find placeholder %r in document. Agenda pages 2 and 3 "
                         "appended to beginning of the document instead.",
-                        value["placeholder"],
+                        BOILERPLATE_INFO[key]["placeholder"],
                     )
-                    text = boilerplate + HR + text
+                    text = value + HR + text
 
         return text
 
@@ -154,12 +167,23 @@ class Command(BaseCommand, ConnManagerMixin):
                 f"Currently supported languages are: {', '.join(display_choices)}"
             )
 
+        try:
+            pretranslated = self.standard_translations.get(language=user_language_value)
+        # stop batch_translate for this language if we don't have any standard translations
+        # set up for it
+        except StandardTranslations.DoesNotExist as err:
+            raise BoilerplateError(
+                f"No standard translations exist for target language: {user_language}"
+            ) from err
+
+        existing_boilerplate = self._get_boilerplate(pretranslated)
+
         if document_content_id := options["document_content"]:
             contents = DocumentContent.objects.select_related("document").filter(
                 id=document_content_id
             )
 
-            self._remove_boilerplate(contents)
+            self._remove_boilerplate(existing_boilerplate, contents)
 
             if not contents.exists():
                 raise ValueError(
@@ -185,7 +209,7 @@ class Command(BaseCommand, ConnManagerMixin):
                 .distinct()
             )
 
-            self._remove_boilerplate(contents)
+            self._remove_boilerplate(existing_boilerplate, contents)
 
         if len(contents) == 0:
             logger.info(f"All Documents have up to date {user_language} translations!")
@@ -208,7 +232,7 @@ class Command(BaseCommand, ConnManagerMixin):
         # put boilerplate back in before creating DB objects
         for _, t in translated_contents.items():
             t["processed_output"] = self._replace_boilerplate(
-                user_language_value, t["raw_output"], t["document_type"]
+                existing_boilerplate, t["raw_output"], t["document_type"]
             )
 
         self.reset_db_connections()
