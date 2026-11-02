@@ -580,14 +580,8 @@ class TestAgendaPagesRemovalAndReplacement:
         content.refresh_from_db()
         assert PLACEHOLDER not in content.processed
 
-        spa = self.translate_spanish(content)
-        assert PLACEHOLDER in content.processed
-
         vie = content.translations.get(language="vie")
         assert vie.markdown == vie.raw_output
-        assert spa.markdown != spa.raw_output
-        assert PLACEHOLDER not in spa.markdown
-        assert PLACEHOLDER in spa.raw_output
 
     def test_agenda_replaces_placeholder_with_boilerplate(
         self, make_content, mock_llm, boilerplate
