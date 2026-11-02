@@ -11,6 +11,7 @@ from conftest import (
     DocumentFactory,
     DocumentTranslationFactory,
     ExtractionConfigFactory,
+    StandardTranslationsFactory,
     TranslationConfigFactory,
 )
 
@@ -529,6 +530,56 @@ class TestAgendaPagesRemovalAndReplacement:
     @pytest.fixture
     def disclaimer(self, standard_translations):
         return standard_translations.disclaimer_text
+
+    def test_that_boilerplate_operations_do_not_run_when_no_boilerplate(
+        self, make_document_pages, translation_config, standard_translations
+    ):
+
+        StandardTranslationsFactory(language="vie", agenda_pages_2_and_3_text="")
+
+        markdown = make_document_pages(5)
+
+        md1 = "This should come before the boilerplate\n\n"
+        md2 = f"{self.placeholder}\n\n"
+        md3 = "This should come after the boilerplate"
+        placeholdered = md1 + md2 + md3
+
+        document = DocumentFactory(entity_type="event", document_id="889")
+        content = DocumentContentFactory(document=document, markdown=markdown)
+
+        with patch(PATCH_TRANSLATE_SERVICE) as mock_service:
+
+            mock_service.return_value.metered_batch_translate.return_value = [
+                {
+                    "document_id": str(content.document.document_id),
+                    "document_type": "event_document",
+                    "markdown": placeholdered,
+                }
+            ]
+
+            run_command(
+                "batch_translate",
+                "Vietnamese",
+            )
+
+            content.refresh_from_db()
+            assert self.placeholder not in content.processed
+
+            run_command(
+                "batch_translate",
+                "Spanish",
+            )
+
+            content.refresh_from_db()
+            assert self.placeholder in content.processed
+
+        spa = content.translations.get(language="spa")
+        vie = content.translations.get(language="vie")
+
+        assert vie.markdown == vie.raw_output
+        assert spa.markdown != spa.raw_output
+        assert self.placeholder not in spa.markdown
+        assert self.placeholder in spa.raw_output
 
     @pytest.mark.parametrize(
         "entity_type, document_type, replaced, placeholder_found",
