@@ -76,8 +76,6 @@ class Command(BaseCommand, ConnManagerMixin):
             logger.info(
                 f"Using already translated boilerplate for {', '.join(existing.keys())}"
             )
-        else:
-            raise BoilerplateError()
         return existing
 
     def _remove_boilerplate(self, boilerplate, contents):
@@ -172,9 +170,8 @@ class Command(BaseCommand, ConnManagerMixin):
                 f"No standard translations exist for target language: {user_language}"
             ) from err
 
-        try:
-            existing_boilerplate = self._get_boilerplate(pretranslated)
-        except BoilerplateError:
+        existing_boilerplate = self._get_boilerplate(pretranslated)
+        if not existing_boilerplate:
             logger.info(
                 "No replacement boilerplate translations found for "
                 f"{user_language}. Continuing to translation as is."
@@ -184,9 +181,7 @@ class Command(BaseCommand, ConnManagerMixin):
             contents = DocumentContent.objects.select_related("document").filter(
                 id=document_content_id
             )
-
             self._remove_boilerplate(existing_boilerplate, contents)
-
             if not contents.exists():
                 raise ValueError(
                     f"Document content with the specified ID '{document_content_id}' "
