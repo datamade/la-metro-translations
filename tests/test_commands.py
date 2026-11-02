@@ -518,169 +518,116 @@ class TestConvertDocsCommand:
         mock_converter.convert_to_pdf.assert_called_once()
 
 
+PLACEHOLDER = BOILERPLATE_INFO["agenda_pages_2_and_3_text"]["placeholder"]
+BEFORE = "This should come before the boilerplate\n\n"
+AFTER = "This should come after the boilerplate"
+PLACEHOLDERED = f"{BEFORE}{PLACEHOLDER}\n\n{AFTER}"
+NO_PLACEHOLDER = "There is no placeholder here"
+
+
+@pytest.mark.usefixtures("translation_config", "standard_translations")
 @pytest.mark.django_db
 class TestAgendaPagesRemovalAndReplacement:
-
-    placeholder = BOILERPLATE_INFO["agenda_pages_2_and_3_text"]["placeholder"]
 
     @pytest.fixture
     def boilerplate(self, standard_translations):
         return standard_translations.agenda_pages_2_and_3_text
 
     @pytest.fixture
-    def disclaimer(self, standard_translations):
-        return standard_translations.disclaimer_text
+    def make_content(self, make_document_pages):
+        def _make(entity_type="event", pages=5, document_id="889"):
+            document = DocumentFactory(entity_type=entity_type, document_id=document_id)
+            return DocumentContentFactory(
+                document=document, markdown=make_document_pages(pages)
+            )
 
-    def test_that_boilerplate_operations_do_not_run_when_no_boilerplate(
-        self, make_document_pages, translation_config, standard_translations
-    ):
+        return _make
 
-        StandardTranslationsFactory(language="vie", agenda_pages_2_and_3_text="")
-
-        markdown = make_document_pages(5)
-
-        md1 = "This should come before the boilerplate\n\n"
-        md2 = f"{self.placeholder}\n\n"
-        md3 = "This should come after the boilerplate"
-        placeholdered = md1 + md2 + md3
-
-        document = DocumentFactory(entity_type="event", document_id="889")
-        content = DocumentContentFactory(document=document, markdown=markdown)
-
+    @pytest.fixture
+    def mock_llm(self):
+        """Patch the translate service; call the returned function to set its output."""
         with patch(PATCH_TRANSLATE_SERVICE) as mock_service:
 
-            mock_service.return_value.metered_batch_translate.return_value = [
-                {
-                    "document_id": str(content.document.document_id),
-                    "document_type": "event_document",
-                    "markdown": placeholdered,
-                }
-            ]
+            def _set(content, markdown, document_type="event_document"):
+                mock_service.return_value.metered_batch_translate.return_value = [
+                    {
+                        "document_id": str(content.document.document_id),
+                        "document_type": document_type,
+                        "markdown": markdown,
+                    }
+                ]
 
-            run_command(
-                "batch_translate",
-                "Vietnamese",
-            )
+            yield _set
 
-            content.refresh_from_db()
-            assert self.placeholder not in content.processed
+    # helper function
+    def translate_spanish(self, content):
+        run_command("batch_translate", "Spanish")
+        content.refresh_from_db()
+        # Check source markdown is never touched
+        # (no placeholder replacing pages 2 and 3)
+        assert PLACEHOLDER not in content.markdown
+        assert "End of Page 2" in content.markdown
+        return content.translations.get(language="spa")
 
-            run_command(
-                "batch_translate",
-                "Spanish",
-            )
+    def test_boilerplate_is_neither_removed_nor_replaced_when_no_boilerplate(
+        self, make_content, mock_llm
+    ):
+        StandardTranslationsFactory(language="vie", agenda_pages_2_and_3_text="")
+        content = make_content()
+        mock_llm(content, PLACEHOLDERED)
 
-            content.refresh_from_db()
-            assert self.placeholder in content.processed
+        run_command("batch_translate", "Vietnamese")
+        content.refresh_from_db()
+        assert PLACEHOLDER not in content.processed
 
-        spa = content.translations.get(language="spa")
+        spa = self.translate_spanish(content)
+        assert PLACEHOLDER in content.processed
+
         vie = content.translations.get(language="vie")
-
         assert vie.markdown == vie.raw_output
         assert spa.markdown != spa.raw_output
-        assert self.placeholder not in spa.markdown
-        assert self.placeholder in spa.raw_output
+        assert PLACEHOLDER not in spa.markdown
+        assert PLACEHOLDER in spa.raw_output
 
-    @pytest.mark.parametrize(
-        "entity_type, document_type, replaced, placeholder_found",
-        [
-            ("event", "event_document", True, True),  # agenda
-            ("bill", "bill_document", False, False),  # bill
-            (
-                "event",
-                "event_document",
-                True,
-                False,
-            ),  # agenda + LLM garbled placeholder
-        ],
-    )
-    def test_batch_translate_removes_and_replaces_agenda_pages_2_3_boilerplate(
-        self,
-        translation_config,
-        make_document_pages,
-        boilerplate,
-        entity_type,
-        document_type,
-        replaced,
-        placeholder_found,
+    def test_agenda_replaces_placeholder_with_boilerplate(
+        self, make_content, mock_llm, boilerplate
     ):
-        """
-        Test that batch_translate does the right thing in trying to remove and replace
-        agenda pages 2 and 3. Only working on agendas, and prepending boilerplate when it
-        can't find the placeholder to replace.
-        """
+        content = make_content("event")
+        mock_llm(content, PLACEHOLDERED)
 
-        markdown = make_document_pages(5)
+        translation = self.translate_spanish(content)
 
-        document = DocumentFactory(entity_type=entity_type, document_id="889")
-        content = DocumentContentFactory(document=document, markdown=markdown)
+        assert PLACEHOLDER in content.processed
+        assert "End of Page 2" not in content.processed
+        assert translation.raw_output == PLACEHOLDERED
+        assert translation.markdown == BEFORE + HR + boilerplate + HR + AFTER
 
-        md1 = "This should come before the boilerplate\n\n"
-        md2 = f"{self.placeholder}\n\n"
-        md3 = "This should come after the boilerplate"
-        no_placeholder = "There is no placeholder here"
-
-        placeholdered_output = md1 + md2 + md3
-
-        with patch(PATCH_TRANSLATE_SERVICE) as mock_service:
-
-            output = (
-                placeholdered_output
-                if document_type == "event_document" and placeholder_found
-                else no_placeholder
-            )
-
-            mock_service.return_value.metered_batch_translate.return_value = [
-                {
-                    "document_id": str(content.document.document_id),
-                    "document_type": document_type,
-                    "markdown": output,
-                }
-            ]
-
-            run_command(
-                "batch_translate",
-                "Spanish",
-            )
-
-        content.refresh_from_db()
-
-        # Agenda processed is modified, and bill is not
-        assert (self.placeholder in content.processed) is replaced
-        assert ("End of Page 2" not in content.processed) is replaced
-
-        # Markdown remains untouched for both
-        assert self.placeholder not in content.markdown
-        assert "End of Page 2" in content.markdown
-
-        translation = DocumentTranslation.objects.get(
-            document_content=content, language="spa"
-        )
-        assert translation
-
-        # agenda but placeholder garbled, should prepend boilerplate
-        if replaced and not placeholder_found:
-            assert translation.raw_output == no_placeholder
-            assert translation.markdown == boilerplate + HR + no_placeholder
-
-        # agenda happy path
-        elif replaced:
-            assert translation.raw_output == placeholdered_output
-            assert translation.markdown == md1 + HR + boilerplate + HR + md3
-
-        # not agenda
-        elif not replaced:
-            assert translation.raw_output == no_placeholder
-            assert translation.markdown == no_placeholder
-
-    def test_batch_translate_errors_out_when_page_markers_not_found(
-        self, make_document_pages, standard_translations
+    def test_agenda_prepends_boilerplate_when_llm_garbles_placeholder(
+        self, make_content, mock_llm, boilerplate
     ):
-        markdown = make_document_pages(1)
-        agenda = DocumentFactory(
-            entity_type="event", document_type="event_document", document_id="10101"
-        )
-        DocumentContentFactory(document=agenda, markdown=markdown)
+        content = make_content("event")
+        mock_llm(content, NO_PLACEHOLDER)
+
+        translation = self.translate_spanish(content)
+
+        assert PLACEHOLDER in content.processed
+        assert "End of Page 2" not in content.processed
+        assert translation.raw_output == NO_PLACEHOLDER
+        assert translation.markdown == boilerplate + HR + NO_PLACEHOLDER
+
+    def test_bill_is_left_alone(self, make_content, mock_llm):
+        content = make_content("bill")
+        mock_llm(content, NO_PLACEHOLDER, document_type="bill_document")
+
+        translation = self.translate_spanish(content)
+
+        assert PLACEHOLDER not in content.processed
+        assert "End of Page 2" in content.processed
+        assert translation.raw_output == NO_PLACEHOLDER
+        assert translation.markdown == NO_PLACEHOLDER
+
+    def test_batch_translate_errors_out_when_page_markers_not_found(self, make_content):
+        make_content("event", pages=1, document_id="10101")
 
         with pytest.raises(BoilerplateError) as excinfo:
             run_command("batch_translate", "Spanish")
