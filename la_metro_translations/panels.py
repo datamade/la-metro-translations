@@ -1,6 +1,7 @@
 from django.apps import apps
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
+from django.forms.widgets import Script
 
 from wagtail.admin.panels import Panel
 
@@ -79,4 +80,4 @@ class MissingTranslationsPanel(Panel):
             return context
 
         class Media:
-            js = ["js/missing_translations.js"]
+            js = [Script("js/missing_translations.js", defer=True)]
