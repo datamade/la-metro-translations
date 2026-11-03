@@ -2,15 +2,16 @@
 {% if missing %}
    <ul class='missing-list'>
 {% for code, display in missing %}
-   <li>
-     <p>{{display}}</p>
-     <button
-       class='button button-small'
-       type='button'
-     >
-       Translate
-     </button>
-   </li>
+     <li data-missing-list>
+       <p>{{display}}</p>
+       <button
+         data-language={{code}}
+         class='button button-small'
+         type='button'
+       >
+         Translate
+       </button>
+     </li>
      {% endfor %}
    </ul>
 {% else %}

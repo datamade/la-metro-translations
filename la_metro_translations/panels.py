@@ -79,4 +79,4 @@ class MissingTranslationsPanel(Panel):
             return context
 
         class Media:
-            js = "missing_translations.js"
+            js = ["js/missing_translations.js"]
