@@ -71,6 +71,11 @@ class RelatedObjectsPanel(Panel):
 
 
 class MissingTranslationsPanel(Panel):
+    """
+    Display a list of all missing translations for a DocumentContent instance,
+    each with a button to run the translation.
+    """
+
     class BoundPanel(Panel.BoundPanel):
         template_name = "panels/missing_translations.html"
 
@@ -81,3 +86,18 @@ class MissingTranslationsPanel(Panel):
 
         class Media:
             js = [Script("js/missing_translations.js", defer=True)]
+
+
+class RerunTranslationPanel(Panel):
+    """
+    Display a button to re-run a translation for any DocumentTranslation instance.
+    """
+
+    class BoundPanel(Panel.BoundPanel):
+
+        def render_html(self, parent_context=None):
+            return mark_safe("""
+            <button class="button button-small">
+            Re-run translation
+            </button>
+            """)

@@ -21,7 +21,12 @@ from .models import (
     ExtractionConfig,
     StandardTranslations,
 )
-from .panels import MissingTranslationsPanel, PropertyPanel, RelatedObjectsPanel
+from .panels import (
+    MissingTranslationsPanel,
+    PropertyPanel,
+    RelatedObjectsPanel,
+    RerunTranslationPanel,
+)
 
 
 @hooks.register("insert_global_admin_css")
@@ -228,6 +233,7 @@ class DocumentContentViewSet(ModelViewSet):
                     [
                         FieldPanel("created_at", read_only=True),
                         FieldPanel("updated_at", read_only=True),
+                        RerunTranslationPanel(),
                     ]
                 ),
                 FieldRowPanel(
@@ -250,7 +256,12 @@ class DocumentContentViewSet(ModelViewSet):
                     "la_metro_translations.DocumentTranslation",
                     "document_content",
                     panels=[
-                        PropertyPanel("language_display"),
+                        FieldRowPanel(
+                            [
+                                PropertyPanel("language_display"),
+                                RerunTranslationPanel(),
+                            ]
+                        ),
                         FieldRowPanel(
                             [
                                 PropertyPanel(
@@ -383,7 +394,12 @@ class DocumentTranslationViewSet(ModelViewSet):
         ),
         MultiFieldPanel(
             [
-                FieldPanel("language", read_only=True),
+                FieldRowPanel(
+                    [
+                        FieldPanel("language", read_only=True),
+                        RerunTranslationPanel("rerun"),
+                    ]
+                ),
                 FieldRowPanel(
                     [
                         FieldPanel("created_at", read_only=True),
