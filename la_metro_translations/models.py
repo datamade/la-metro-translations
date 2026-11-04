@@ -701,7 +701,16 @@ class StandardTranslations(models.Model):
     agenda_download_text = models.TextField(default="")
     board_report_download_text = models.TextField(default="")
     disclaimer_text = models.TextField(default="")
-    agenda_pages_2_and_3_text = MarkdownField(default="")
+    agenda_pages_2_and_3_text = MarkdownField(
+        default="",
+        help_text=(mark_safe("""
+            This text will directly replace pages 2 and 3 in all translated meeting
+            agendas. If we cannot determine where pages 2 and 3 should be placed
+            post-translation, it will be added to the beginning of the document.<br /><br
+            />Leave this field BLANK to send the entirety of the document to the LLM to be
+            translated as usual.
+            """)),
+    )
 
     def __str__(self):
         return f"{self.get_language_display()} [{self.language}] Standard Translations"
