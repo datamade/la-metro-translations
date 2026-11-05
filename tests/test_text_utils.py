@@ -3,12 +3,49 @@ from la_metro_translations.utils import (
     BoilerplateError,
     replace_inner_region_with_placeholder,
     replace_placeholder_with_pretranslated_text,
+    unique_match,
 )
 
 
 @pytest.fixture
 def markdown(make_document_pages):
     return make_document_pages(5)
+
+
+class TestUniqueMatch:
+
+    def test_unique_match_errors_when_no_match(self):
+        with pytest.raises(BoilerplateError, match="0"):
+            unique_match(text="cat", token="not")
+
+    def test_unique_match_errors_when_more_than_one_match(self):
+        with pytest.raises(BoilerplateError, match="4"):
+            unique_match(text="notnotnotnot", token="not")
+
+    def test_unique_match_finds_unique_match(self):
+        match = unique_match(text="not a cat", token="not")
+        assert match.start() == 0
+        assert match.end() == 3
+
+    def test_unique_match_does_not_allow_extra_digits_after_page_numbers(self):
+        with pytest.raises(BoilerplateError, match="0"):
+            unique_match(text="End of Page 13", token="End of Page 1")
+
+    @pytest.mark.parametrize(
+        "line_ending",
+        [
+            (""),
+            ("\n\n"),
+            ("\r\n"),
+            ("\r\n\r\n"),
+        ],
+    )
+    def test_unique_match_finds_page_endings_with_any_line_endings(self, line_ending):
+        match = unique_match(
+            text=f"Here's some text before the End of Page 1{line_ending}",
+            token="End of Page 1",
+        )
+        assert match[0] == f"End of Page 1{line_ending}"
 
 
 class TestReplaceInnerRegion:
