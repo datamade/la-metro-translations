@@ -264,7 +264,7 @@ class Command(BaseCommand, ConnManagerMixin):
             document_translations,
             update_conflicts=True,
             unique_fields=["document_content", "language"],
-            update_fields=["markdown", "approval_status", "updated_at"],
+            update_fields=["raw_output", "markdown", "approval_status", "updated_at"],
         )
 
         logger.info(
