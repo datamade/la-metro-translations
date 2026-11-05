@@ -84,7 +84,6 @@ services:
       - .:/app
     environment:
       DJANGO_SECRET_KEY: reallysupersecret
-      DJANGO_MANAGEPY_MIGRATE: "on"
       DJANGO_DEBUG: "True"
       PGPASSWORD: postgres
     env_file:
@@ -105,7 +104,6 @@ services:
       - .:/app
     environment:
       DJANGO_SECRET_KEY: reallysupersecret
-      DJANGO_MANAGEPY_MIGRATE: "on"
       DJANGO_DEBUG: "True"
       PGPASSWORD: postgres
     env_file:
