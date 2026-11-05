@@ -11,7 +11,14 @@ from conftest import (
     DocumentFactory,
     DocumentTranslationFactory,
     ExtractionConfigFactory,
+    StandardTranslationsFactory,
     TranslationConfigFactory,
+)
+
+from la_metro_translations.utils import (
+    BOILERPLATE_INFO,
+    HR,
+    BoilerplateError,
 )
 from la_metro_translations.models import (
     DocumentContent,
@@ -55,6 +62,34 @@ PATCH_CHECK_BATCH_JOB = (
 )
 
 
+@pytest.fixture(autouse=True)
+def no_reset_db_translate():
+    with patch(PATCH_TRANSLATE_RESET_DB):
+        yield
+
+
+@pytest.fixture(autouse=True)
+def no_reset_db_convert():
+    with patch(PATCH_CONVERT_RESET_DB):
+        yield
+
+
+@pytest.fixture
+def doc_id_counter():
+    counter = itertools.count(1)
+    return lambda: next(counter)
+
+
+@pytest.fixture
+def make_translation(doc_id_counter):
+    def _make(language="spa"):
+        doc = DocumentFactory(document_id=doc_id_counter())
+        content = DocumentContentFactory(document=doc)
+        return DocumentTranslationFactory(document_content=content, language=language)
+
+    return _make
+
+
 @pytest.mark.django_db
 class TestBatchTranslateCommand:
     """
@@ -64,24 +99,20 @@ class TestBatchTranslateCommand:
     """
 
     @pytest.fixture(autouse=True)
-    def no_reset_db(self):
-        with patch(PATCH_TRANSLATE_RESET_DB):
-            yield
-
-    @pytest.fixture(autouse=True)
     def mock_translate_service(self, document_content):
         with patch(PATCH_TRANSLATE_SERVICE) as mock_service:
             mock_service.return_value.metered_batch_translate.return_value = [
                 {
                     "document_id": str(document_content.document.document_id),
                     "markdown": "translated text",
+                    "document_type": "bill_document",
                 }
             ]
             yield mock_service
 
     @pytest.mark.parametrize("approval_status", ["waiting", "approved"])
     def test_creates_translations_with_correct_approval_status(
-        self, approval_status, document_content
+        self, approval_status, document_content, standard_translations
     ):
         with patch(PATCH_TRANSLATE_CALL_COMMAND):
             run_command(
@@ -108,6 +139,7 @@ class TestBatchTranslateCommand:
         approval_status,
         expect_convert_docs,
         document_content,
+        standard_translations,
     ):
         run_command(
             "batch_translate",
@@ -123,7 +155,7 @@ class TestBatchTranslateCommand:
 
     @patch(PATCH_TRANSLATE_CALL_COMMAND)
     def test_approval_status_updated_on_conflict(
-        self, mock_call_command, document_content
+        self, mock_call_command, document_content, standard_translations
     ):
         DocumentTranslationFactory(
             document_content=document_content,
@@ -144,7 +176,7 @@ class TestBatchTranslateCommand:
         assert translation.approval_status == "waiting"
 
     def test_chunk_single_documents_groups_pages_by_chunk_size(
-        self, make_document_pages
+        self, make_document_pages, standard_translations
     ):
         content = make_document_pages(55)
 
@@ -155,7 +187,7 @@ class TestBatchTranslateCommand:
             assert chunk.count("End of Page") == 5
 
     def test_chunk_single_documents_returns_single_chunk_for_small_document(
-        self, make_document_pages
+        self, make_document_pages, standard_translations
     ):
         content = make_document_pages(3)
 
@@ -165,7 +197,11 @@ class TestBatchTranslateCommand:
         assert chunks[0].count("End of Page") == 3
 
     def test_batch_translate_stitches_chunks_in_numeric_order(
-        self, document_content, make_document_pages, translation_config
+        self,
+        document_content,
+        make_document_pages,
+        translation_config,
+        standard_translations,
     ):
         """
         Check that chunks are stitched back in actual numeric order (0, 1, 2, ..., 10)
@@ -174,6 +210,7 @@ class TestBatchTranslateCommand:
         This case would only happen if a document produces more than 10 chunks.
         """
         document_content.markdown = make_document_pages(55)
+        document_content.processed = document_content.markdown
         document_content.save()
 
         doc = document_content.document
@@ -208,13 +245,14 @@ class TestBatchTranslateCommand:
         assert translations[0]["markdown"] == expected_markdown
 
     def test_batch_translate_skips_document_missing_chunks(
-        self, document_content, make_document_pages
+        self, document_content, make_document_pages, standard_translations
     ):
         """
         Check that we don't create translations when our translation service doesn't
         return all chunks from a single document, instead of creating an incomplete one.
         """
         document_content.markdown = make_document_pages(10)
+        document_content.processed = document_content.markdown
         document_content.save()
 
         doc = document_content.document
@@ -248,7 +286,9 @@ class TestBatchTranslateCommand:
         "target_translator",
         [choice[0] for choice in TranslationConfig.TARGET_TRANSLATOR_CHOICES],
     )
-    def test_translations_use_chosen_llm(self, document_content, target_translator):
+    def test_translations_use_chosen_llm(
+        self, document_content, target_translator, standard_translations
+    ):
         """
         Check that translation jobs use the llm chosen by the user
         per the language's config settings.
@@ -370,27 +410,6 @@ class TestConvertDocsCommand:
     and PDFs for all non-English DocumentTranslations with out-of-date PDFs.
     """
 
-    @pytest.fixture(autouse=True)
-    def no_reset_db(self):
-        with patch(PATCH_CONVERT_RESET_DB):
-            yield
-
-    @pytest.fixture
-    def doc_id_counter(self):
-        counter = itertools.count(1)
-        return lambda: next(counter)
-
-    @pytest.fixture
-    def make_translation(self, doc_id_counter):
-        def _make(language="spa"):
-            doc = DocumentFactory(document_id=doc_id_counter())
-            content = DocumentContentFactory(document=doc)
-            return DocumentTranslationFactory(
-                document_content=content, language=language
-            )
-
-        return _make
-
     def _set_updated_at(self, obj, dt):
         type(obj).objects.filter(pk=obj.pk).update(updated_at=dt)
         obj.refresh_from_db()
@@ -497,3 +516,116 @@ class TestConvertDocsCommand:
 
         mock_converter.convert_to_rtf.assert_called_once()
         mock_converter.convert_to_pdf.assert_called_once()
+
+
+PLACEHOLDER = BOILERPLATE_INFO["agenda_pages_2_and_3_text"]["placeholder"]
+BEFORE = "This should come before the boilerplate\n\n"
+AFTER = "This should come after the boilerplate"
+PLACEHOLDERED = f"{BEFORE}{PLACEHOLDER}\n\n{AFTER}"
+NO_PLACEHOLDER = "There is no placeholder here"
+
+
+@pytest.mark.usefixtures("translation_config", "standard_translations")
+@pytest.mark.django_db
+class TestAgendaPagesRemovalAndReplacement:
+
+    @pytest.fixture
+    def boilerplate(self, standard_translations):
+        return standard_translations.agenda_pages_2_and_3_text
+
+    @pytest.fixture
+    def make_content(self, make_document_pages):
+        def _make(entity_type="event", pages=5, document_id="889"):
+            document = DocumentFactory(entity_type=entity_type, document_id=document_id)
+            return DocumentContentFactory(
+                document=document, markdown=make_document_pages(pages)
+            )
+
+        return _make
+
+    @pytest.fixture
+    def mock_llm(self):
+        """Patch the translate service; call the returned function to set its output."""
+        with patch(PATCH_TRANSLATE_SERVICE) as mock_service:
+
+            def _set(content, markdown, document_type="event_document"):
+                mock_service.return_value.metered_batch_translate.return_value = [
+                    {
+                        "document_id": str(content.document.document_id),
+                        "document_type": document_type,
+                        "markdown": markdown,
+                    }
+                ]
+
+            yield _set
+
+    # helper function
+    def translate_spanish(self, content):
+        run_command("batch_translate", "Spanish")
+        content.refresh_from_db()
+        # Check source markdown is never touched
+        # (no placeholder replacing pages 2 and 3)
+        assert PLACEHOLDER not in content.markdown
+        assert "End of Page 2" in content.markdown
+        return content.translations.get(language="spa")
+
+    def test_boilerplate_is_neither_removed_nor_replaced_when_no_boilerplate(
+        self, make_content, mock_llm
+    ):
+        StandardTranslationsFactory(language="vie", agenda_pages_2_and_3_text="")
+        content = make_content()
+        mock_llm(content, PLACEHOLDERED)
+
+        run_command("batch_translate", "Vietnamese")
+        content.refresh_from_db()
+        assert PLACEHOLDER not in content.processed
+
+        vie = content.translations.get(language="vie")
+        assert vie.markdown == vie.raw_output
+
+    def test_agenda_replaces_placeholder_with_boilerplate(
+        self, make_content, mock_llm, boilerplate
+    ):
+        content = make_content("event")
+        mock_llm(content, PLACEHOLDERED)
+
+        translation = self.translate_spanish(content)
+
+        assert PLACEHOLDER in content.processed
+        assert "End of Page 2" not in content.processed
+        assert translation.raw_output == PLACEHOLDERED
+        assert translation.markdown == BEFORE + HR + boilerplate + HR + AFTER
+
+    def test_agenda_prepends_boilerplate_when_llm_garbles_placeholder(
+        self, make_content, mock_llm, boilerplate
+    ):
+        content = make_content("event")
+        mock_llm(content, NO_PLACEHOLDER)
+
+        translation = self.translate_spanish(content)
+
+        assert PLACEHOLDER in content.processed
+        assert "End of Page 2" not in content.processed
+        assert translation.raw_output == NO_PLACEHOLDER
+        assert translation.markdown == boilerplate + HR + NO_PLACEHOLDER
+
+    def test_bill_is_left_alone(self, make_content, mock_llm):
+        content = make_content("bill")
+        mock_llm(content, NO_PLACEHOLDER, document_type="bill_document")
+
+        translation = self.translate_spanish(content)
+
+        assert PLACEHOLDER not in content.processed
+        assert "End of Page 2" in content.processed
+        assert translation.raw_output == NO_PLACEHOLDER
+        assert translation.markdown == NO_PLACEHOLDER
+
+    def test_batch_translate_errors_out_when_page_markers_not_found(self, make_content):
+        make_content("event", pages=1, document_id="10101")
+
+        with pytest.raises(BoilerplateError) as excinfo:
+            run_command("batch_translate", "Spanish")
+
+        assert "Expected exactly one instance" in str(excinfo.value.__cause__)
+        assert "0" in str(excinfo.value.__cause__)
+        assert "End of page markers not found" in str(excinfo.value)

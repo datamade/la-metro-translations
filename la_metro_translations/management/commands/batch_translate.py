@@ -8,9 +8,17 @@ from django.db.models import F, Case, When
 from la_metro_translations.models import (
     DocumentContent,
     DocumentTranslation,
+    StandardTranslations,
 )
 from la_metro_translations.services import get_translation_service
 from la_metro_translations.management.commands.utils import ConnManagerMixin
+from la_metro_translations.utils import (
+    BoilerplateError,
+    replace_inner_region_with_placeholder,
+    replace_placeholder_with_pretranslated_text,
+    BOILERPLATE_INFO,
+    HR,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +35,8 @@ class Command(BaseCommand, ConnManagerMixin):
         "have been updated more recently than their DocumentTranslation for "
         "that language, then upsert its DocumentTranslation."
     )
+
+    standard_translations = StandardTranslations.objects.all()
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -55,13 +65,83 @@ class Command(BaseCommand, ConnManagerMixin):
             ),
         )
 
+    # Check if boilerplate exists and inform user
+    def _get_boilerplate(self, pretranslated) -> dict[str, str]:
+        existing = {}
+        for key in BOILERPLATE_INFO.keys():
+            boilerplate = getattr(pretranslated, key)
+            if boilerplate != "":
+                existing[key] = boilerplate
+        if existing:
+            logger.info(
+                f"Using already translated boilerplate for {', '.join(existing.keys())}"
+            )
+        return existing
+
+    def _remove_boilerplate(self, boilerplate, contents):
+        """
+        Remove boilerplate from documents so we don't keep re-translating it.
+
+        Pre-translated boilerplate will be re-inserted in the conversion step.
+        """
+
+        # If standard translations for language are not set up at all, do not continue.
+
+        for content in contents:
+
+            md_text = content.markdown
+            content.processed = md_text
+
+            for key in boilerplate.keys():
+
+                # Remove page 2 and 3 of event agendas
+                if (
+                    key == "agenda_pages_2_and_3_text"
+                    and content.document.get_entity_type_display() == "Event"
+                ):
+                    try:
+                        content.processed = replace_inner_region_with_placeholder(
+                            md_text, **BOILERPLATE_INFO[key]
+                        )
+                    except BoilerplateError as err:
+                        raise BoilerplateError(
+                            "\n End of page markers not found for document %r"
+                            % content.document.document_id
+                        ) from err
+
+        DocumentContent.objects.bulk_update(contents, ["processed"])
+
+    def _replace_boilerplate(self, boilerplate, text, document_type):
+        """
+        After translation is returned from LLM, find and replace placeholders inserted
+        by the _remove_boilerplate step.
+        """
+
+        for key, value in boilerplate.items():
+            placeholder = BOILERPLATE_INFO[key]["placeholder"]
+            if "agenda_pages_2_and_3" in key and document_type == "event_document":
+                try:
+                    text = replace_placeholder_with_pretranslated_text(
+                        text, boilerplate=value, placeholder=placeholder
+                    )
+                except BoilerplateError as err:
+                    logger.warning(err)
+                    logger.warning(
+                        "Could not find placeholder %r in document. Agenda pages 2 and 3 "
+                        "appended to beginning of the document instead.",
+                        BOILERPLATE_INFO[key]["placeholder"],
+                    )
+                    text = value + HR + text
+
+        return text
+
     def handle(self, **options):
         approval_status = options["approval_status"]
 
         supported_languages = [
-            choice
-            for choice in DocumentTranslation.LANGUAGE_CHOICES
-            if choice[0] != "eng"
+            (value, display)
+            for value, display in DocumentTranslation.LANGUAGE_CHOICES
+            if value != "eng"
         ]
 
         user_language = options["language"].title()
@@ -73,18 +153,35 @@ class Command(BaseCommand, ConnManagerMixin):
             ),
             None,
         )
+
         if not user_language_value:
-            display_choices = [choice[1] for choice in supported_languages]
+            display_choices = [display for _, display in supported_languages]
             raise ValueError(
                 f"This suite does not support translations to {user_language}. "
                 f"Currently supported languages are: {', '.join(display_choices)}"
+            )
+
+        try:
+            pretranslated = self.standard_translations.get(language=user_language_value)
+        # stop batch_translate for this language if we don't have any standard translations
+        # set up for it
+        except StandardTranslations.DoesNotExist as err:
+            raise BoilerplateError(
+                f"No standard translations exist for target language: {user_language}"
+            ) from err
+
+        existing_boilerplate = self._get_boilerplate(pretranslated)
+        if not existing_boilerplate:
+            logger.info(
+                "No replacement boilerplate translations found for "
+                f"{user_language}. Continuing to translation as is."
             )
 
         if document_content_id := options["document_content"]:
             contents = DocumentContent.objects.select_related("document").filter(
                 id=document_content_id
             )
-
+            self._remove_boilerplate(existing_boilerplate, contents)
             if not contents.exists():
                 raise ValueError(
                     f"Document content with the specified ID '{document_content_id}' "
@@ -109,6 +206,8 @@ class Command(BaseCommand, ConnManagerMixin):
                 .distinct()
             )
 
+            self._remove_boilerplate(existing_boilerplate, contents)
+
         if len(contents) == 0:
             logger.info(f"All Documents have up to date {user_language} translations!")
             return
@@ -118,11 +217,20 @@ class Command(BaseCommand, ConnManagerMixin):
             )
 
         translated_contents = {
-            t["document_id"]: t["markdown"]
+            t["document_id"]: {
+                "document_type": t["document_type"],
+                "raw_output": t["markdown"],
+            }
             for t in get_translation_service().metered_batch_translate(
                 contents, user_language
             )
         }
+
+        # put boilerplate back in before creating DB objects
+        for _, t in translated_contents.items():
+            t["processed_output"] = self._replace_boilerplate(
+                existing_boilerplate, t["raw_output"], t["document_type"]
+            )
 
         self.reset_db_connections()
 
@@ -145,7 +253,8 @@ class Command(BaseCommand, ConnManagerMixin):
                 DocumentTranslation(
                     document_content=content,
                     language=user_language_value,
-                    markdown=matched_translation,
+                    raw_output=matched_translation["raw_output"],
+                    markdown=matched_translation["processed_output"],
                     approval_status=approval_status,
                     updated_at=now,
                 )

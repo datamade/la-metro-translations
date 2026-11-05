@@ -161,7 +161,7 @@ class MistralTranslationService(TranslationService):
         result_map = {}
         for content in contents:
             modded_text, images_cache = MistralTranslationService.cache_images(
-                source_text=content.markdown
+                source_text=str(content.processed)
             )
             related_doc = content.document
             doc_custom_id = f"{related_doc.document_type}:{related_doc.document_id}"
@@ -403,7 +403,7 @@ class MistralTranslationService(TranslationService):
         contents = list(contents)
         for i, content in enumerate(contents):
             # Check size of upcoming request
-            curr_batch_size += sys.getsizeof(content.markdown) + sys_msg_size
+            curr_batch_size += sys.getsizeof(content.processed) + sys_msg_size
             curr_batch.append(content)
 
             # Send batch if we've exceeded max size or at the end of the list

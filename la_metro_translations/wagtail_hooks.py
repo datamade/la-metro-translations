@@ -416,6 +416,7 @@ class StandardTranslationsViewSet(SnippetViewSet):
         FieldPanel("agenda_download_text"),
         FieldPanel("board_report_download_text"),
         FieldPanel("disclaimer_text"),
+        FieldPanel("agenda_pages_2_and_3_text"),
     ]
 
 
