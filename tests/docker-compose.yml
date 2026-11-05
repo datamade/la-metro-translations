@@ -7,4 +7,6 @@ services:
       # Disable manifest storage for testing
       DJANGO_STATICFILES_STORAGE: django.contrib.staticfiles.storage.StaticFilesStorage
       DJANGO_SETTINGS_MODULE: la_metro_translations.settings
+      # Run Celery tasks synchronously, without a worker
+      CELERY_TASK_ALWAYS_EAGER: "True"
     command: pytest -sv
