@@ -10,31 +10,39 @@ class BoilerplateError(ValueError):
     """
 
 
+# at the moment, no regex should be in start and end tokens
+# regex is handled using constant patterns inside unique_match
 BOILERPLATE_INFO: dict[str, dict[str, str]] = {
     "agenda_pages_2_and_3_text": {
         "placeholder": "<AGENDA_PAGE_2_3_PLACEHOLDER>",
-        "start": "End of Page 1\n\n",
-        "end": "End of Page 3\n\n",
+        "start": "End of Page 1",
+        "end": "End of Page 3",
     }
 }
 
 HR = "\n\n---\n\n"
 
 
-def unique_index(text: str, token: str) -> int:
+def unique_match(text: str, token: str) -> re.Match:
     """
     Find the starting index of a given token with a stretch of text.
     Raise an error if the token is not unique.
     """
-    count = text.count(token)
+    PAGE_END_PATTERN = r"(?!\d)[\r\n]*"
+
+    if "End of Page" in token:
+        token = token + PAGE_END_PATTERN
+
+    matches = list(re.finditer(token, text))
+    count = len(matches)
     if count != 1:
         raise BoilerplateError(
             f"Expected exactly one instance of {token!r}, found {count}"
         )
-    return text.index(token)
+    return matches[0]
 
 
-def get_marker_indexes(text: str, start: str, end: str) -> tuple[int, int]:
+def get_marker_matches(text: str, start: str, end: str) -> tuple[re.Match, re.Match]:
     """
     Helper function for removing boilerplate.
 
@@ -43,13 +51,13 @@ def get_marker_indexes(text: str, start: str, end: str) -> tuple[int, int]:
     either of these assumptions don't hold.
     """
 
-    start_index = unique_index(text, start)
-    end_index = unique_index(text, end)
+    start_match = unique_match(text, start)
+    end_match = unique_match(text, end)
 
-    if end_index < start_index:
+    if end_match.start() < start_match.start():
         raise BoilerplateError(f"{end!r} appears before {start!r}")
 
-    return start_index, end_index
+    return start_match, end_match
 
 
 def replace_inner_region_with_placeholder(
@@ -65,9 +73,9 @@ def replace_inner_region_with_placeholder(
     Insert placeholder only if no error.
     """
 
-    start_index, end_index = get_marker_indexes(text, start, end)
-    before = text[: start_index + len(start)]  # don't cut out start string
-    after = text[end_index + len(end) :]  # do cut out end string
+    start_match, end_match = get_marker_matches(text, start, end)
+    before = text[: start_match.end()]  # don't cut out start string
+    after = text[end_match.end() :]  # do cut out end string
     return before + placeholder + "\n\n" + after
 
 
