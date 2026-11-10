@@ -63,6 +63,7 @@ class DocumentTranslationFactory(factory.django.DjangoModelFactory):
 
     markdown = "Jugar querer montaña quince, otro gris más"
     language = "spa"
+    raw_output = "This came from the LLM"
     approval_status = "waiting"
 
 
