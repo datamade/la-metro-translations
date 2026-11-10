@@ -1,7 +1,7 @@
 import itertools
 import json
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 from django.core.management import call_command as run_command
@@ -88,6 +88,11 @@ def make_translation(doc_id_counter):
         return DocumentTranslationFactory(document_content=content, language=language)
 
     return _make
+
+
+def _set_updated_at(obj, dt):
+    type(obj).objects.filter(pk=obj.pk).update(updated_at=dt)
+    obj.refresh_from_db()
 
 
 @pytest.mark.django_db
@@ -410,10 +415,6 @@ class TestConvertDocsCommand:
     and PDFs for all non-English DocumentTranslations with out-of-date PDFs.
     """
 
-    def _set_updated_at(self, obj, dt):
-        type(obj).objects.filter(pk=obj.pk).update(updated_at=dt)
-        obj.refresh_from_db()
-
     def _make_translation_file(self, translation, fmt, updated_at=None):
         file = TranslationFile.objects.create(
             document_translation=translation, format=fmt
@@ -436,11 +437,11 @@ class TestConvertDocsCommand:
         make_translation()  # creates translation missing an RTF
 
         outdated_rtf = make_translation()  # RTF exists but is stale
-        self._set_updated_at(outdated_rtf, now)
+        _set_updated_at(outdated_rtf, now)
         self._make_translation_file(outdated_rtf, "rtf", updated_at=past)
 
         up_to_date = make_translation()  # RTF is current
-        self._set_updated_at(up_to_date, past)
+        _set_updated_at(up_to_date, past)
         self._make_translation_file(up_to_date, "rtf", updated_at=now)
 
         run_command("convert_docs")
@@ -467,11 +468,11 @@ class TestConvertDocsCommand:
         make_translation(language="spa")  # creates translation missing a PDF
 
         outdated = make_translation(language="zho-cn")  # PDF exists but is stale
-        self._set_updated_at(outdated, now)
+        _set_updated_at(outdated, now)
         self._make_translation_file(outdated, "pdf", updated_at=past)
 
         up_to_date = make_translation(language="kor")  # PDF is current
-        self._set_updated_at(up_to_date, past)
+        _set_updated_at(up_to_date, past)
         self._make_translation_file(up_to_date, "pdf", updated_at=now)
 
         run_command("convert_docs")
@@ -489,12 +490,12 @@ class TestConvertDocsCommand:
         past = now - timedelta(hours=1)
 
         non_eng = make_translation(language="spa")
-        self._set_updated_at(non_eng, past)
+        _set_updated_at(non_eng, past)
         self._make_translation_file(non_eng, "rtf", updated_at=now)
         self._make_translation_file(non_eng, "pdf", updated_at=now)
 
         eng = make_translation(language="eng")
-        self._set_updated_at(eng, past)
+        _set_updated_at(eng, past)
         self._make_translation_file(eng, "rtf", updated_at=now)
 
         run_command("convert_docs")
@@ -589,6 +590,33 @@ class TestAgendaPagesRemovalAndReplacement:
         content = make_content("event")
         mock_llm(content, PLACEHOLDERED)
 
+        translation = self.translate_spanish(content)
+
+        assert PLACEHOLDER in content.processed
+        assert "End of Page 2" not in content.processed
+        assert translation.raw_output == PLACEHOLDERED
+        assert translation.markdown == BEFORE + HR + boilerplate + HR + AFTER
+
+    def test_agenda_updates_correct_fields_on_conflict(
+        self, make_content, mock_llm, boilerplate
+    ):
+        content = make_content("event")
+        prev_raw_output = "Shouldn't stay in here"
+        prev_markdown = "Nor should this"
+        prev_translation = DocumentTranslationFactory(
+            document_content=content,
+            language="spa",
+            raw_output=prev_raw_output,
+            markdown=prev_markdown,
+        )
+
+        # need to create stale timestamp to get update to happen
+        _set_updated_at(
+            prev_translation,
+            datetime(2025, 1, 1, 11, 45, 2, 569832, tzinfo=timezone.utc),
+        )
+
+        mock_llm(content, PLACEHOLDERED)
         translation = self.translate_spanish(content)
 
         assert PLACEHOLDER in content.processed
