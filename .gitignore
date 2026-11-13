@@ -5,6 +5,9 @@ out.txt
 /data/shapefiles/*
 /data/intermediate/*.sql
 
+# Celery
+celerybeat-schedule*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

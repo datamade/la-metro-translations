@@ -2,8 +2,8 @@ name: Daily document ETL dispatcher
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "0 0 * * *" # Runs every day at midnight UTC
+  # schedule:
+  #   - cron: "0 0 * * *" # Runs every day at midnight UTC
 
 jobs:
   production:
