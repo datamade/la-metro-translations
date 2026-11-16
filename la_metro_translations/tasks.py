@@ -10,12 +10,12 @@ def debug_task(self):
     return "Task successfully run!"
 
 
-@shared_task(bind=True, name="batch_extract")
+@shared_task(bind=True, name="batch_extract", soft_time_limit=21600)
 def run_batch_extract(self):
     out = StringIO()
-    call_command("batch_extract", stdout=out)
 
-    if "SUCCESS" in out.getvalue():
-        return "SUCCESS"
-    else:
-        return "FAILURE"
+    try:
+        call_command("batch_extract", stdout=out)
+    finally:
+        # Pipe management command logger output to the task result
+        return out.getvalue()
