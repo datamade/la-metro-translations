@@ -15,7 +15,5 @@ def run_batch_extract(self):
     out = StringIO()
     call_command("batch_extract", stdout=out)
 
-    if "SUCCESS" in out.getvalue():
-        return "SUCCESS"
-    else:
-        return "FAILURE"
+    # Pipe management command logger output to the task result
+    return out.getvalue()
